@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.CodedOutputStream;
 import cn.hutool.core.lang.Pair;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
@@ -97,7 +98,8 @@ public final class BilibiliV2Fixture {
   }
 
   private static void verify(String encoding) throws Exception {
-    String java = Path.of(System.getProperty("java.home"), "bin", "java.exe").toString();
+    String executable = File.separatorChar == '\\' ? "java.exe" : "java";
+    String java = Path.of(System.getProperty("java.home"), "bin", executable).toString();
     var child = new ProcessBuilder(java, "-Djdk.net.unixdomain.tmpdir=" + java, "-Dfile.encoding=UTF-8", "-Dstdout.encoding=" + encoding,
       "-cp", System.getProperty("java.class.path"), BilibiliV2Fixture.class.getName(), "--emit").start();
     var stdout = CompletableFuture.supplyAsync(() -> {
