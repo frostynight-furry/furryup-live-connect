@@ -1,0 +1,14 @@
+node_modules/
+collector/target/
+*.log
+*.jsonl
+*.ndjson
+.env
+.env.*
+config*.json
+credentials*.json
+cookies*.json
+user-data/
+artifacts/
+.DS_Store
+Thumbs.db

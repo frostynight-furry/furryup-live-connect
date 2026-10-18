@@ -1,0 +1,27 @@
+{
+  "name": "furryup-live-connect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FurryUP 四平台直播互动采集：B站、抖音、快手、视频号，统一事件与头像补全",
+  "license": "MIT",
+  "author": "FrostyNight",
+  "main": "core/index.cjs",
+  "repository": { "type": "git", "url": "https://github.com/frostynight-furry/furryup-live-connect.git" },
+  "homepage": "https://github.com/frostynight-furry/furryup-live-connect#readme",
+  "bugs": { "url": "https://github.com/frostynight-furry/furryup-live-connect/issues" },
+  "keywords": ["furryup", "livestream", "danmaku", "bilibili", "douyin", "kuaishou", "wechat"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "build": "node scripts/build-java.cjs",
+    "test": "node scripts/test.cjs",
+    "test:wechat": "node --test test/wechat.test.cjs",
+    "test:core": "node --test test/core*.cjs",
+    "test:java": "node scripts/test-java.cjs",
+    "start:java": "node examples/java-stdin.cjs",
+    "start:java:subscribe": "node examples/java-subscribe.cjs",
+    "start:wechat": "electron examples/wechat-electron.cjs",
+    "start:subscribe": "node examples/subscribe.cjs",
+    "audit": "node scripts/audit-source.cjs"
+  },
+  "devDependencies": { "electron": "43.1.1" }
+}

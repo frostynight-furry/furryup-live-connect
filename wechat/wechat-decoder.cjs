@@ -1,0 +1,110 @@
+'use strict';
+// Message types documented by fire4nt/wxlivespy (MIT); see THIRD_PARTY_NOTICES.
+// Current notice types and liveStatus are also confirmed by the official
+// video-account assistant's 26092402 build (module 44704 / updateAppList):
+// https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/969.9949886a.js
+// 20125 is a generic interaction notice: wording is display text, not a share
+// discriminator. Never infer a paid action or share from that text.
+const MAX_BODY = 2 * 1024 * 1024;
+const LIVE_URL = 'https://channels.weixin.qq.com/platform/live/liveBuild';
+const MESSAGE_PATHS = new Set([
+  '/cgi-bin/mmfinderassistant-bin/live/msg',
+  '/micro/live/cgi-bin/mmfinderassistant-bin/live/msg'
+]);
+function isMessageUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'channels.weixin.qq.com' && !url.port &&
+      !url.username && !url.password && MESSAGE_PATHS.has(url.pathname);
+  } catch { return false; }
+}
+function identifier(value) {
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) return '';
+  return typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 128) : '';
+}
+function counter(value) {
+  if (typeof value === 'string' && /^\d{1,15}$/.test(value)) value = Number(value);
+  return Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000_000 ? value : undefined;
+}
+function boundedText(value, max = 1000) {
+  return typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, max) : '';
+}
+function liveStatus(value) {
+  const status = counter(value);
+  return status === 0 ? 'ended' : status === 1 ? 'started' : status === 2 ? 'waiting' : '';
+}
+function payload(value) {
+  if (typeof value !== 'string' || !value || value.length > 128 * 1024) throw new Error('Invalid payload');
+  const result = JSON.parse(Buffer.from(value, 'base64').toString('utf8'));
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Invalid payload');
+  return result;
+}
+function identity(message, kind, contact = message) {
+  const sourceId = identifier(message.clientMsgId) || identifier(message.localClientMsgId) || (identifier(message.seq) ? `${kind}:${identifier(message.seq)}` : '');
+  return { source_msg_id: sourceId, user_id: identifier(contact.username),
+    user_name: boundedText(contact.nickname, 64),
+    avatar_url: boundedText(contact.headUrl || contact.headImgUrl, 2048) };
+}
+function decodeWechatResponse(body, request = {}) {
+  if (typeof body !== 'string' || Buffer.byteLength(body, 'utf8') > MAX_BODY) throw new Error('Invalid response');
+  const response = JSON.parse(body);
+  if (!response || typeof response !== 'object' || response.errCode !== 0) return { error: 'LOGIN_OR_PROTOCOL', events: [], roomId: '' };
+  const data = response.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid response');
+  const info = data.liveInfo && typeof data.liveInfo === 'object' && !Array.isArray(data.liveInfo) ? data.liveInfo : {};
+  const roomId = identifier(info.liveId) || identifier(request.liveId);
+  if (!roomId || !/^[A-Za-z0-9_-]{1,128}$/.test(roomId)) return { events: [], roomId: '', errors: 0 };
+  const events = [];
+  let errors = 0, giftCallbacks = 0, giftParseErrors = 0;
+  for (const message of (Array.isArray(data.msgList) ? data.msgList : []).slice(0, 2000)) {
+    if (!message || typeof message !== 'object') { errors++; continue; }
+    const type = counter(message.type);
+    if (type !== 1 && type !== 10005) continue;
+    if (type === 1 && typeof message.content !== 'string') { errors++; continue; }
+    const contact = message.finderLiveContact?.contact;
+    const viewer = { username: message.username || contact?.username,
+      nickname: contact?.nickname || message.nickname,
+      headUrl: contact?.headUrl || contact?.headImgUrl || message.headUrl || message.headImgUrl };
+    events.push({ ...identity(message, 'msg', viewer),
+      event_type: type === 1 ? 'comment' : 'enter', content: boundedText(message.content) });
+  }
+  for (const message of (Array.isArray(data.appMsgList) ? data.appMsgList : []).slice(0, 2000)) {
+    if (!message || typeof message !== 'object') { errors++; continue; }
+    const type = counter(message.msgType);
+    // 20013 is a combo-total notification, not another paid gift increment.
+    // Count confirmed 20009 rewards only; never award both for the same gift.
+    if (![20009, 20006, 20078, 20122, 20125].includes(type)) continue;
+    const from = message.fromUserContact || {};
+    const contact = from.contact || {};
+    const user = identity(message, 'app', { ...contact, nickname: contact.nickname || from.displayNickname });
+    if (type === 20006) { events.push({ ...user, event_type: 'like', count: 1, count_mode: 'signal' }); continue; }
+    if (type !== 20009) {
+      try {
+        const notice = payload(message.payload);
+        const wording = boundedText(notice.wording);
+        if (type === 20125 && !wording.trim()) throw new Error('Invalid notice');
+        events.push({ ...user, event_type: type === 20078 ? 'follow' : type === 20122 ? 'like' : 'notice',
+          content: wording, count: 1, ...(type === 20122 && { count_mode: 'signal' }) });
+      } catch { errors++; }
+      continue;
+    }
+    giftCallbacks++;
+    try {
+      const gift = payload(message.payload);
+      const count = counter(gift.reward_product_count);
+      const giftId = identifier(gift.reward_product_id);
+      if (!giftId || !count || count > 1_000_000) throw new Error('Invalid gift');
+      events.push({ ...user, event_type: 'gift', gift_id: giftId, gift_count: count,
+        gift_name: boundedText(gift.reward_product_name, 100),
+        content: boundedText(gift.content),
+        gift_price_raw: gift.reward_amount_in_wecoin, gift_price_unit: 'wechat_bean' });
+    } catch { errors++; giftParseErrors++; }
+  }
+  const stats = Object.fromEntries([['onlineCnt', 'watching_count'], ['likeCnt', 'liked_count']]
+    .map(([key, target]) => [target, counter(info[key])]).filter(([, value]) => value !== undefined));
+  if (Object.keys(stats).length) events.push({ event_type: 'room_stats', ...stats });
+  // This is a snapshot. The collector emits it only on the first valid value or
+  // a change, rather than adding a fresh live-status event on every long poll.
+  return { roomId, events, liveStatus: liveStatus(info.liveStatus), errors, giftCallbacks, giftParseErrors };
+}
+module.exports = { decodeWechatResponse, isMessageUrl, LIVE_URL, MAX_BODY };
