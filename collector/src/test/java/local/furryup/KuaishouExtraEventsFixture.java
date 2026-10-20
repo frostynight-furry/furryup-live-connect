@@ -172,6 +172,29 @@ public final class KuaishouExtraEventsFixture {
     var watching = SCWebLiveWatchingUsersOuterClass.SCWebLiveWatchingUsers.newBuilder()
       .addWatchingUser(WebWatchingUserInfoOuterClass.WebWatchingUserInfo.newBuilder().setUser(USER)).build();
     check(KuaishouExtraEvents.decode(command(PayloadType.SC_LIVE_WATCHING_LIST, watching)).isEmpty(), "Watching list is not a newcomer feed");
+    check(KuaishouExtraEvents.snapshot(command(PayloadType.SC_LIVE_WATCHING_LIST, watching)) == null,
+      "A nonempty partial list does not invent an audience count");
+    var watchingStats = KuaishouExtraEvents.snapshot(command(PayloadType.SC_LIVE_WATCHING_LIST,
+      watching.toBuilder().setDisplayWatchingCount("42").setPendingDuration(30000).build()));
+    check(watchingStats != null && watchingStats.path("watching_count").asInt() == 42
+      && !watchingStats.has("liked_count") && !watchingStats.has("watched_count"),
+      "Watching-list field 2 supplies its explicit count independently of list length and duration");
+    var watchingZero = KuaishouExtraEvents.snapshot(command(PayloadType.SC_LIVE_WATCHING_LIST,
+      watching.toBuilder().setDisplayWatchingCount("0").build()));
+    check(watchingZero != null && watchingZero.has("watching_count") && watchingZero.path("watching_count").asInt(-1) == 0,
+      "Explicit zero from a watching-list response is retained");
+    for (String value : List.of("", "1.2万", "12K", "-1", " 42 ", "1000000000001")) {
+      check(KuaishouExtraEvents.snapshot(command(PayloadType.SC_LIVE_WATCHING_LIST,
+        watching.toBuilder().setDisplayWatchingCount(value).build())) == null,
+        "Unknown, rounded and invalid watching-list counters stay absent");
+    }
+    var noticeText = SCWebFeedPush.newBuilder()
+      .addSystemNoticeFeeds(WebSystemNoticeFeedOuterClass.WebSystemNoticeFeed.newBuilder()
+        .setId("looks-like-enter").setUser(USER).setContent("某位观众进入了直播间"))
+      .addSystemNoticeFeeds(WebSystemNoticeFeedOuterClass.WebSystemNoticeFeed.newBuilder()
+        .setId("looks-like-follow").setUser(USER).setContent("某位观众关注了主播")).build();
+    check(KuaishouExtraEvents.decode(command(PayloadType.SC_FEED_PUSH, noticeText)).isEmpty(),
+      "Unclassified notice text is not interpreted as an enter or follow event");
     var ack = SCWebEnterRoomAckOuterClass.SCWebEnterRoomAck.newBuilder().setHeartbeatIntervalMs(10000).build();
     check(KuaishouExtraEvents.decode(command(PayloadType.SC_ENTER_ROOM_ACK, ack)).isEmpty(), "Connection acknowledgement is not viewer entry");
     var malformed = new KuaishouCmdMsg(SocketMessage.newBuilder().setPayloadType(PayloadType.SC_FEED_PUSH)
@@ -189,7 +212,7 @@ public final class KuaishouExtraEventsFixture {
     verifyPipeline(false); verifyPipeline(true);
     if (args.length > 0 && args[0].equals("--emit")) emitProduction();
     else new PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out), true, java.nio.charset.StandardCharsets.UTF_8)
-      .println("PASS: Kuaishou raw shares/counters, stable IDs, binary NONE/GZIP SDK dispatch, isolated combo fixtures, actual zero versus absent/invalid snapshots, malformed limits and no invented newcomers.");
+      .println("PASS: Kuaishou raw shares/feed and watching-list counters, stable IDs, binary NONE/GZIP SDK dispatch, isolated combo fixtures, actual zero versus absent/invalid snapshots, malformed limits and no invented newcomers or follows.");
     System.exit(0);
   }
 }

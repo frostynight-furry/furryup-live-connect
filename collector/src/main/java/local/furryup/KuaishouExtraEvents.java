@@ -11,6 +11,7 @@ import java.util.List;
 import tech.ordinaryroad.live.chat.client.codec.kuaishou.msg.KuaishouCmdMsg;
 import tech.ordinaryroad.live.chat.client.codec.kuaishou.protobuf.PayloadTypeOuterClass.PayloadType;
 import tech.ordinaryroad.live.chat.client.codec.kuaishou.protobuf.SCWebFeedPushOuterClass.SCWebFeedPush;
+import tech.ordinaryroad.live.chat.client.codec.kuaishou.protobuf.SCWebLiveWatchingUsersOuterClass.SCWebLiveWatchingUsers;
 import tech.ordinaryroad.live.chat.client.codec.kuaishou.protobuf.WebShareFeedOuterClass.WebShareFeed;
 
 /** Decode genuine feed interactions which OrdinaryRoad 1.5.8 does not dispatch. */
@@ -62,14 +63,22 @@ final class KuaishouExtraEvents {
 
   /** SDK stats replace absent/invalid feed counters with 0; retain only values actually sent. */
   static ObjectNode snapshot(Object message) throws IOException {
-    if (!(message instanceof KuaishouCmdMsg cmd) || cmd.getMsg() == null
-        || cmd.getMsg().getPayloadType() != PayloadType.SC_FEED_PUSH) return null;
+    if (!(message instanceof KuaishouCmdMsg cmd) || cmd.getMsg() == null) return null;
+    PayloadType type = cmd.getMsg().getPayloadType();
+    if (type != PayloadType.SC_FEED_PUSH && type != PayloadType.SC_LIVE_WATCHING_LIST) return null;
     var payload = cmd.getMsg().getPayload();
     if (payload.size() > MAX_PAYLOAD_BYTES) throw new IOException("Kuaishou feed payload exceeds limit");
-    SCWebFeedPush feed = SCWebFeedPush.parseFrom(payload);
     ObjectNode event = JSON.createObjectNode().put("event_type", "room_stats");
-    counter(event, "watching_count", feed.getDisplayWatchingCount());
-    counter(event, "liked_count", feed.getDisplayLikeCount());
+    if (type == PayloadType.SC_LIVE_WATCHING_LIST) {
+      // The 340 protocol supplies its own displayWatchingCount (field 2).
+      // A partial list's length and pendingDuration do not prove audience size.
+      var list = SCWebLiveWatchingUsers.parseFrom(payload);
+      counter(event, "watching_count", list.getDisplayWatchingCount());
+    } else {
+      SCWebFeedPush feed = SCWebFeedPush.parseFrom(payload);
+      counter(event, "watching_count", feed.getDisplayWatchingCount());
+      counter(event, "liked_count", feed.getDisplayLikeCount());
+    }
     return event.size() > 1 ? event : null;
   }
 

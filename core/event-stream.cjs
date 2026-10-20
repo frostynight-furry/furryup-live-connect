@@ -55,8 +55,18 @@ const rawPrice = value => {
 };
 
 const PK_PROTOCOLS = Object.freeze({
+  bilibili: Object.freeze({
+    PK_BATTLE_PRE: ['preparing', 'battle-preparing'],
+    PK_BATTLE_PRE_NEW: ['preparing', 'battle-preparing'],
+    PK_BATTLE_START: ['active', 'battle-started'],
+    PK_BATTLE_START_NEW: ['active', 'battle-started'],
+    PK_BATTLE_PROCESS: ['active', 'battle-progress'],
+    PK_BATTLE_PROCESS_NEW: ['active', 'battle-progress'],
+    PK_BATTLE_END: ['ended', 'battle-finished']
+  }),
   kuaishou: Object.freeze({ SC_PK_STATISTIC: ['active', undefined], SC_PIP_ENDED: ['ended', 'link-ended'] }),
   douyin: Object.freeze({
+    WebcastLinkMicMethod: ['active', 'battle-progress'],
     WebcastLinkMicBattleMethod: ['active', undefined], WebcastLinkmicBattleMethod: ['active', undefined],
     WebcastLinkMicBattleFinishMethod: ['ended', 'battle-finished'], WebcastLinkmicBattleFinishMethod: ['ended', 'battle-finished'],
     WebcastLinkMicArmiesMethod: ['active', 'battle-refresh'], WebcastLinkmicArmiesMethod: ['active', 'battle-refresh']
@@ -89,6 +99,51 @@ function normalizePk(value, platform) {
     if (value[key] === undefined) continue;
     if (typeof value[key] !== 'string' || !/^\d{1,20}$/.test(value[key]) || BigInt(value[key]) > 18446744073709551615n) throw new Error('PK 协议数值无效');
     result[key] = value[key];
+  }
+  if (value.participants !== undefined) {
+    if (!['bilibili', 'douyin'].includes(platform) || !Array.isArray(value.participants) ||
+        !value.participants.length || value.participants.length > 2) throw new Error('PK 双方资料无效');
+    if (platform === 'douyin' && !['WebcastLinkMicMethod', 'WebcastLinkMicBattleFinishMethod', 'WebcastLinkmicBattleFinishMethod'].includes(value.protocol))
+      throw new Error('PK 比分协议依据无效');
+    const sides = new Set(), rooms = new Set(), users = new Set();
+    result.participants = Object.freeze(value.participants.map(item => {
+      const expectedSides = platform === 'douyin' ? ['participant'] : value.phase === 'preparing' ? ['opponent'] : ['init', 'match'];
+      if (!item || typeof item !== 'object' || Array.isArray(item) || !expectedSides.includes(item.side) ||
+          platform === 'bilibili' && sides.has(item.side)) throw new Error('PK 双方身份无效');
+      sides.add(item.side);
+      const participant = { side: item.side };
+      if (item.roomId !== undefined || platform === 'bilibili') {
+        if (typeof item.roomId !== 'string' || !/^[1-9]\d{0,19}$/.test(item.roomId) || rooms.has(item.roomId))
+          throw new Error('PK 房间身份无效');
+        rooms.add(item.roomId); participant.roomId = item.roomId;
+      }
+      if (item.userId !== undefined || platform === 'douyin') {
+        if (typeof item.userId !== 'string' || !/^[1-9]\d{0,19}$/.test(item.userId) || users.has(item.userId))
+          throw new Error('PK 用户身份无效');
+        users.add(item.userId); participant.userId = item.userId;
+      }
+      const userName = optionalText(item.userName, 64);
+      if (userName) participant.userName = userName;
+      const avatar = avatarInfo(item.avatarUrl, platform);
+      if (avatar.avatar_id) Object.assign(participant, { avatarUrl: avatar.avatar_url, avatarId: avatar.avatar_id });
+      if (item.score !== undefined) {
+        if (typeof item.score !== 'string' || !/^(?:0|[1-9]\d{0,19})$/.test(item.score) ||
+            BigInt(item.score) > 18446744073709551615n) throw new Error('PK 比分无效');
+        participant.score = item.score;
+      }
+      if (item.scoreDisplay !== undefined) {
+        if (platform !== 'douyin' || item.score !== undefined || typeof item.scoreDisplay !== 'string' ||
+            !item.scoreDisplay.trim() || item.scoreDisplay.length > 64 || /[\u0000-\u001f\u007f]/.test(item.scoreDisplay))
+          throw new Error('PK 显示分数无效');
+        participant.scoreDisplay = item.scoreDisplay;
+      }
+      return Object.freeze(participant);
+    }));
+  }
+  if (value.scoreUnit !== undefined) {
+    if (platform !== 'bilibili' || typeof value.scoreUnit !== 'string' || !value.scoreUnit.trim() ||
+        value.scoreUnit.length > 32 || /[\u0000-\u001f\u007f]/.test(value.scoreUnit)) throw new Error('PK 比分单位无效');
+    result.scoreUnit = value.scoreUnit;
   }
   return Object.freeze(result);
 }
@@ -141,8 +196,14 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
       const userId = viewerId(viewer.userId);
       const userLevel = nonnegativeCount(viewer.userLevel, 1000);
       const wealthLevel = nonnegativeCount(viewer.wealthLevel, 1000);
+      const rank = nonnegativeCount(viewer.rank, 500);
+      // A directly supplied display image does not establish a stable identity.
+      // Anonymous rows remain unlinked to chat or other viewer rows.
+      const avatar = avatarInfo(viewer.avatarUrl, platform);
       return Object.freeze({ ...(userId ? { userId } : {}), userName: optionalText(viewer.userName, 64) || '一位朋友',
         ...(userLevel !== undefined ? { userLevel } : {}), ...(wealthLevel !== undefined ? { wealthLevel } : {}),
+        ...(rank > 0 ? { rank } : {}),
+        ...(avatar.avatar_id ? { avatarUrl: avatar.avatar_url, avatarId: avatar.avatar_id } : {}),
         ...(typeof viewer.online === 'boolean' ? { online: viewer.online } : {}),
         ...(typeof viewer.highWealth === 'boolean' ? { highWealth: viewer.highWealth } : {}) });
     });

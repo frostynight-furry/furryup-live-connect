@@ -11,13 +11,15 @@ const allowed = new Set([
   'package.json', 'package-lock.json', 'collector/pom.xml', 'collector/src/main/resources/logback.xml',
   'licenses/ORDINARYROAD-LICENSE.txt', 'licenses/BLIVEDM-LICENSE.txt', 'licenses/WXLIVESPY-LICENSE.txt',
   'wechat/wechat-collector.cjs', 'wechat/wechat-decoder.cjs', 'test/wechat.test.cjs',
+  'wechat/wechat-gifts.cjs', 'wechat/wechat-viewers.cjs', 'test/wechat-gifts.test.cjs', 'test/wechat-viewers.test.cjs',
   'examples/java-stdin.cjs', 'examples/wechat-electron.cjs', 'examples/subscribe.cjs', 'examples/java-subscribe.cjs',
   'examples/offline-demo.cjs', 'examples/multi-platform.cjs', 'test/examples.test.cjs',
   'core/index.cjs', 'core/event-stream.cjs', 'core/avatar-cache.cjs', 'core/kuaishou-profile-avatars.cjs', 'core/emotes.cjs', 'core/java-collector.cjs',
   'test/core.test.cjs', 'test/core-avatar-cache.test.cjs', 'test/core-kuaishou-profile-avatars.test.cjs', 'test/core-java-collector.test.cjs',
+  'test/core-capabilities.test.cjs',
   'scripts/audit-source.cjs', 'scripts/build-java.cjs', 'scripts/java-runtime.cjs', 'scripts/test.cjs', 'scripts/test-java.cjs'
 ]);
-for (const name of ['BilibiliExtraEvents', 'BilibiliGiftV2', 'BilibiliInteractV2', 'Collector', 'ConnectionFailure',
+for (const name of ['BilibiliExtraEvents', 'BilibiliGiftV2', 'BilibiliInteractV2', 'Collector', 'ConnectionFailure', 'DouyinPkScores',
   'DouyinAuthenticatedClient', 'KuaishouAvatarCache', 'KuaishouExtraEvents', 'MessageEmotes', 'PkEvents', 'ViewerSnapshots'])
   allowed.add(`collector/src/main/java/local/furryup/${name}.java`);
 for (const name of ['BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',

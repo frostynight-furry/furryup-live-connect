@@ -566,3 +566,155 @@ test('视频号不截断消息与用户身份，无效或冲突房间不回退�
   assert.equal(decodeWechatResponse(JSON.stringify(response), { liveId: prefix + 'a' }).roomId, '');
   assert.equal(decodeWechatResponse(JSON.stringify({ errCode: 0, data: { msgList: [] } }), { liveId: 'room' }).roomId, 'room');
 });
+
+const giftCatalogUrl = 'https://channels.weixin.qq.com/micro/live/cgi-bin/mmfinderassistant-bin/live/gift_enum_list';
+const viewerListUrl = 'https://channels.weixin.qq.com/micro/live/cgi-bin/mmfinderassistant-bin/live/online_member';
+const syntheticGiftCatalog = (image = 'https://mmbiz.qpic.cn/synthetic-gift.png') =>
+  ({ errCode: 0, data: { giftList: [{ rewardProductId: 'gift-42', thumbnailFileUrl: image }] } });
+const syntheticViewers = (name = '合成观众') => ({ errCode: 0, data: {
+  liveContacts: [{ displayNickname: name, contact: { username: 'synthetic-viewer', headUrl: 'https://wx.qlogo.cn/synthetic-viewer.png' } }]
+} });
+async function startResponse(f, requestId, endpoint, liveId = 'fixture-live-room', status = 200) {
+  const run = f.collector.run;
+  await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId,
+    request: { url: endpoint, postData: JSON.stringify({ liveId, secret: 'MUST_NOT_RETAIN' }) } });
+  await f.collector.networkMessage(run, 'Network.responseReceived', { requestId, response: { url: endpoint, status } });
+}
+async function finishResponse(f, requestId, encodedDataLength = 100) {
+  await f.collector.networkMessage(f.collector.run, 'Network.loadingFinished', { requestId, encodedDataLength });
+}
+
+test('被动目录接入补齐真实礼物增量图片，目录本身不产生互动或连接状态', async () => {
+  const f = browserFixture({ messageResponse: ({ requestId }) => requestId === 'catalog' ? syntheticGiftCatalog() : sample() });
+  await f.connect({ remember: false });
+  const run = f.collector.run, stateCount = f.states.length;
+  await startResponse(f, 'catalog', giftCatalogUrl);
+  assert.doesNotMatch(JSON.stringify([...run.metadataRequests.values()]), /MUST_NOT_RETAIN/);
+  await finishResponse(f, 'catalog');
+  assert.equal(f.states.length, stateCount); assert.deepEqual(f.events, []);
+  await startResponse(f, 'message', url); await finishResponse(f, 'message');
+  const giftEvent = f.events.find(item => item.event.event_type === 'gift').event;
+  assert.equal(giftEvent.gift_image_url, 'https://mmbiz.qpic.cn/synthetic-gift.png');
+  assert.equal(giftEvent.gift_name, '小心心'); assert.equal(giftEvent.gift_count, 2);
+  assert.equal(giftEvent.gift_price_raw, '20'); assert.equal(giftEvent.source_msg_id, 'gift-1');
+  const { createLiveConnect } = require('../core/index.cjs');
+  const hub = createLiveConnect(), room = hub.openRoom({ platform: 'wechat', roomId: 'fixture-live-room' });
+  room.ingest(giftEvent); room.ingest(giftEvent);
+  assert.equal(room.history().length, 1);
+  assert.equal(room.history()[0].gift_image_url, giftEvent.gift_image_url);
+  hub.close();
+  assert.ok(f.commands.every(command => ['Network.enable', 'Network.getResponseBody'].includes(command.name)),
+    'collector never initiates an API request');
+  await f.collector.stop();
+  assert.equal(run.giftCatalog.rooms.size, 0);
+});
+
+test('目录响应乱序、房间隔离、错误和停止中的迟到结果不会替换有效图片', async () => {
+  const old = deferred(), stopping = deferred();
+  const f = browserFixture({ messageResponse: ({ requestId }) =>
+    requestId === 'old' ? old.promise : requestId === 'stopping' ? stopping.promise :
+      requestId === 'invalid' ? { errCode: 0, data: { unknown: [] } } :
+        syntheticGiftCatalog('https://mmbiz.qpic.cn/newer.png') });
+  await f.connect({ remember: false }); const run = f.collector.run;
+  await startResponse(f, 'old', giftCatalogUrl); const pending = finishResponse(f, 'old');
+  await startResponse(f, 'new', giftCatalogUrl); await finishResponse(f, 'new');
+  old.resolve(syntheticGiftCatalog('https://mmbiz.qpic.cn/older.png')); await pending;
+  const giftEvent = { event_type: 'gift', gift_id: 'gift-42' };
+  assert.equal(run.giftCatalog.enrich(giftEvent, 'fixture-live-room').gift_image_url, 'https://mmbiz.qpic.cn/newer.png');
+  assert.equal(run.giftCatalog.enrich(giftEvent, 'another-room'), giftEvent);
+  await startResponse(f, 'invalid', giftCatalogUrl); await finishResponse(f, 'invalid');
+  assert.equal(run.giftCatalog.enrich(giftEvent, 'fixture-live-room').gift_image_url, 'https://mmbiz.qpic.cn/newer.png');
+  await startResponse(f, 'stopping', giftCatalogUrl); const late = finishResponse(f, 'stopping');
+  await f.collector.stop();
+  stopping.resolve(syntheticGiftCatalog()); await late;
+  assert.equal(run.giftCatalog.rooms.size, 0); assert.equal(run.metadataInFlight, 0);
+  assert.deepEqual(f.events, []);
+});
+
+test('辅助响应要求已捕获精确房间，拒绝重定向、失败、过大或过密请求并继续接收弹幕', async () => {
+  const gate = deferred();
+  const f = browserFixture({ bodyResponse: ({ requestId }) => requestId.startsWith('pending') ? gate.promise :
+    Promise.resolve({ body: requestId === 'malformed' ? '{' :
+      JSON.stringify(requestId === 'message' ? sample() : syntheticGiftCatalog()), base64Encoded: false }) });
+  await f.connect({ remember: false }); const run = f.collector.run;
+  await f.collector.networkMessage(run, 'Network.responseReceived', { requestId: 'untracked', response: { url: giftCatalogUrl, status: 200 } });
+  await finishResponse(f, 'untracked');
+  for (const [id, liveId, status] of [['no-room', undefined, 200], ['bad-room', ' room ', 200], ['denied', 'fixture-live-room', 403]]) {
+    // undefined is deliberately serialized as an omitted key here.
+    await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId: id,
+      request: { url: giftCatalogUrl, postData: JSON.stringify({ liveId }) } });
+    await f.collector.networkMessage(run, 'Network.responseReceived', { requestId: id, response: { url: giftCatalogUrl, status } });
+    await finishResponse(f, id);
+  }
+  await startResponse(f, 'redirect', giftCatalogUrl);
+  await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId: 'redirect', request: { url: 'https://unrelated.invalid/response' } });
+  await finishResponse(f, 'redirect');
+  await startResponse(f, 'huge', giftCatalogUrl); await finishResponse(f, 'huge', MAX_BODY + 1);
+  assert.equal(f.commands.filter(command => command.name === 'Network.getResponseBody').length, 0);
+  await startResponse(f, 'malformed', giftCatalogUrl); await finishResponse(f, 'malformed');
+  const pending = [];
+  for (let i = 0; i < 3; i++) {
+    await startResponse(f, `pending-${i}`, giftCatalogUrl);
+    pending.push(finishResponse(f, `pending-${i}`));
+  }
+  assert.equal(run.metadataInFlight, 2);
+  await startResponse(f, 'message', url); await finishResponse(f, 'message');
+  assert.ok(f.events.some(item => item.event.event_type === 'comment'));
+  assert.equal(f.states.some(state => state.state === 'message-error'), false);
+  gate.resolve({ body: JSON.stringify(syntheticGiftCatalog()), base64Encoded: false }); await Promise.all(pending);
+  for (let i = 0; i < 40; i++) await startResponse(f, `bounded-${i}`, giftCatalogUrl);
+  assert.equal(run.metadataRequests.size, 32);
+  await f.collector.stop();
+});
+
+test('被动在线名单是部分快照，只发当前房间的最新请求，空名单也保持快照语义', async () => {
+  const old = deferred();
+  const f = browserFixture({ messageResponse: ({ requestId }) =>
+    requestId === 'message' ? sample() : requestId === 'old' ? old.promise :
+      requestId === 'empty' ? { errCode: 0, data: { liveContacts: [] } } : syntheticViewers('最新合成观众') });
+  await f.connect({ remember: false });
+  await startResponse(f, 'before-room', viewerListUrl); await finishResponse(f, 'before-room');
+  assert.deepEqual(f.events, []);
+  await startResponse(f, 'message', url); await finishResponse(f, 'message');
+  const stateCount = f.states.length;
+  await startResponse(f, 'old', viewerListUrl); const pending = finishResponse(f, 'old');
+  await startResponse(f, 'new', viewerListUrl); await finishResponse(f, 'new');
+  old.resolve(syntheticViewers('旧合成观众')); await pending;
+  const snapshots = () => f.events.filter(item => item.event.event_type === 'viewer_snapshot');
+  assert.equal(snapshots().length, 1);
+  assert.equal(snapshots()[0].event.viewer_snapshot.viewers[0].userName, '最新合成观众');
+  assert.equal(snapshots()[0].event.viewer_snapshot.complete, false);
+  assert.equal(snapshots()[0].event.viewer_snapshot.presenceEvidence, 'online-list');
+  await startResponse(f, 'other-room', viewerListUrl, 'other-room'); await finishResponse(f, 'other-room');
+  assert.equal(snapshots().length, 1);
+  await startResponse(f, 'empty', viewerListUrl); await finishResponse(f, 'empty');
+  assert.equal(snapshots().length, 2);
+  assert.deepEqual(snapshots()[1].event.viewer_snapshot.viewers, []);
+  assert.notEqual(snapshots()[0].event.source_msg_id, snapshots()[1].event.source_msg_id);
+  assert.equal(f.states.length, stateCount);
+  await f.collector.stop();
+});
+
+test('切房后的旧名单和停止后的名单不回到事件流，畸形名单不改变连接状态', async () => {
+  const old = deferred(), late = deferred();
+  const f = browserFixture({ bodyResponse: ({ requestId }) => {
+    if (requestId === 'old-viewers') return old.promise;
+    if (requestId === 'late-viewers') return late.promise;
+    const value = sample();
+    if (requestId === 'new-message') value.data.liveInfo.liveId = 'new-room';
+    return { body: requestId === 'broken-viewers' ? '{' : JSON.stringify(value), base64Encoded: false };
+  } });
+  await f.connect({ remember: false }); const run = f.collector.run;
+  await startResponse(f, 'old-message', url); await finishResponse(f, 'old-message');
+  await startResponse(f, 'old-viewers', viewerListUrl); const pending = finishResponse(f, 'old-viewers');
+  await startResponse(f, 'new-message', url, 'new-room'); await finishResponse(f, 'new-message');
+  old.resolve({ body: JSON.stringify(syntheticViewers()), base64Encoded: false }); await pending;
+  const stateCount = f.states.length;
+  await startResponse(f, 'broken-viewers', viewerListUrl, 'new-room'); await finishResponse(f, 'broken-viewers');
+  assert.equal(f.states.length, stateCount);
+  await startResponse(f, 'late-viewers', viewerListUrl, 'new-room'); const stopping = finishResponse(f, 'late-viewers');
+  await f.collector.stop();
+  late.resolve({ body: JSON.stringify(syntheticViewers()), base64Encoded: false }); await stopping;
+  assert.equal(f.events.some(item => item.event.event_type === 'viewer_snapshot'), false);
+  assert.equal(run.metadataRequests.size, 0);
+});

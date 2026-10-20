@@ -9,7 +9,7 @@ body:
     id: version
     attributes:
       label: LiveConnect 版本或提交
-      placeholder: "例如 0.1.1 或 Git commit"
+      placeholder: "例如 0.2.0 或 Git commit"
     validations:
       required: true
   - type: dropdown

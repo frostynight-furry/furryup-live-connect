@@ -1,24 +1,27 @@
 # 能力路线图
 
-核查日期：2026-10-20。这里区分已实现能力、可参考线索和待验证能力；没有承诺上线时间。实际支持范围以 [README 能力表](../README.md#当前数据能力) 为准。
+核查日期：2026-10-20，版本 0.2.0。这里区分已实现的解析、授权环境待验证项与缺失的数据入口；没有承诺上线时间。实际支持范围以 [README 能力表](../README.md#当前数据能力) 为准。
 
 ## 先做好独立可用的底层
 
 首版已经包含平台采集适配、统一事件、去重与有限重连、头像缓存、订阅接口、测试和示例。后续优先保持字段语义准确、故障可定位、四平台相互隔离；协议升级不能把不确定数据变成虚假的完整数据。
 
-| 优先级 | 工作 | 当前证据 | 完成条件 |
+| 状态 | 工作 | 当前证据与实现 | 仍需完成 |
 | --- | --- | --- | --- |
-| 优先验证 | B站基础 PK 比分与对手 | `qydysky/bili_danmu` 有实际 `PK_BATTLE_PROCESS_NEW` 处理，读取双方 votes；有对手资料结构 | 核对来源许可；用合成 fixture 验证双方归属、场次和比分；确认授权房间的实际事件；开始、结束、断线后状态不串局 |
-| 优先验证 | 视频号礼物图片 | `wordweb/Get-Tencent-Video-Live-Barrage-Gifts` 有 `gift_enum_list` 请求线索，但不能据此认定有完整图片解析 | 在授权后台确认目录响应、礼物 ID 与图片字段对应；有界缓存、图片来源限制与过期行为；不重复计礼物 |
-| 后续适配 | 抖音更完整的 PK | 有公开协议字段与样本说明可供核查 | 按实际 PK 模式验证对手、队伍和最终比分；贡献者分数不得冒充双方总分；乱序、结束、重连均有测试 |
-| 先确认数据入口 | 快手逐人进房 / 关注 | 当前公开采集链没有已验证的可靠事件 | 找到明确事件来源和语义后再实现；不能把采集客户端入房握手、首次发言或人数变化当作观众动作 |
-| 暂不承诺完整性 | 四平台全量在线名单 | 排行榜、座位、部分可见观众和互动记录都不等于完整在线名单 | 只有来源确实提供全量范围与完成标记，才可声明完整；否则继续标为部分可见数据 |
+| 已适配基础双人模式 | B站 PK 比分与对手 | 7 个旧版／新版准备、开始、进度和结束命令；双方房间、精确比分、来源单位及对手资料；真实 SDK 编解码与核心接入离线测试 | 授权直播间验证字段覆盖；更多团队／特殊 PK 模式；不根据当前比分猜最终胜负 |
+| 已适配目录映射 | 视频号礼物图片 | 官方后台 `gift_enum_list` 的 `data.giftList`，按 `rewardProductId → thumbnailFileUrl` 映射；按房间隔离、有界缓存、过期与乱序保护，不重放礼物 | 授权后台验证实际目录时序及图片 CDN；后台未返回目录或来源不受支持时仍无图 |
+| 已适配部分比分协议 | 抖音更完整的 PK | 官方网页协议和 PK 组件确认双人比分更新与结束比分；区分参赛者与贡献者，模糊／相对分数只保留显示文本 | 授权环境验证不同模式；团队、多人和特殊玩法仍需各自字段依据，不能宣称完整 PK |
+| 仍缺可靠事件 | 快手逐人进房 / 关注 | 复核 OrdinaryRoad 1.5.8 及当前官方静态协议，现有 feed 不含明确逐人动作；入房 ACK 是采集连接握手，富文本不能确证动作类型 | 需要真实、明确的动作协议来源；不从首次发言、榜单变化或人数变化推断 |
+| 新增部分名单；全量仍缺 | 四平台全量在线名单 | 视频号新增后台 `liveContacts` 可见名单；快手部分观看列表与抖音贡献榜补头像，抖音另保留原始名次。现有来源均无全量完成依据 | 只有来源确实提供全量范围与完成标记，才可声明完整；不能合并互动记录假造全名单 |
 
-参考入口（调研资料，不代表已经移植）：
+本轮没有真实账号或直播间实测。离线测试验证解析、字段边界和采集管线，不证明每个房间都会推送这些消息。快手完整 PK 与视频号 PK 仍缺可靠比分结构；视频号仅确认了 `pkStatus=20018` 枚举，枚举本身不足以解析状态或比分。
 
-- [B站实际 PK 处理代码](https://github.com/qydysky/bili_danmu/blob/master/Reply/Reply.go)与[对手资料模型](https://github.com/qydysky/bili_danmu/blob/master/Reply/ws_msg/PK_BATTLE_PRE_NEW.go)。
-- [视频号目录请求代码](https://github.com/wordweb/Get-Tencent-Video-Live-Barrage-Gifts/blob/main/webapi.py)。接口线索还需要确认当前后台是否可用、返回哪些字段。
-- [抖音协议与样本说明](https://github.com/opedium/douyin-live-proto/blob/master/docs/complete_payload_reference.md)。不同模式须分别验证，不把结构定义本身当作采集成功证据。
+固定参考入口（独立字段适配，不分发上游源码）：
+
+- [B站 PK 数据模型](https://github.com/qydysky/bili_danmu/tree/76304fa1c5e337d20837a2b346a3c2a90c680996/Reply/ws_msg)与[结束事件类型](https://github.com/ShmilyChen/bilive_client/blob/c0d70369ef5b3128309201ffb0f65522b31d5444/bilive/%40types/danmaku.d.ts)。
+- [视频号官方礼物图片消费字段](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/794.72f12fb9.js)和[官方接口／目录结构](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/805.b6dd9a5a.js)。旧[开源请求线索](https://github.com/wordweb/Get-Tencent-Video-Live-Barrage-Gifts/blob/002d1186f138cb8e15d2b389a9bc71cc797b49f9/webapi.py)没有图片字段解析，也未找到许可证，未复制其代码。
+- [抖音官方消息协议](https://lf-webcast-platform.bytetos.com/obj/webcast-platform-cdn/webcast/douyin_live/chunks/live-schema-im.e322bd8a.js)；不同模式须分别验证，不把其他平台的同名协议直接套用。
+- [快手当前官方静态协议](https://p2-game.kskwai.com/udata/pkg/KS-GAME-WEB/pc-live-next/js/app.1241f9804c38413b871f.js)与[名单展示处理](https://p2-game.kskwai.com/udata/pkg/KS-GAME-WEB/pc-live-next/js/liveRoom.1241f9804c38413b871f.js)。调研只读取公开静态资源，没有进入直播间。
 
 引入代码前核对固定提交、许可证与必要归属。上面列出的调研项目不是本仓库的运行依赖；当前实际使用的第三方来源见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
 

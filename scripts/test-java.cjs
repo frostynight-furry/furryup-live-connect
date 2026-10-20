@@ -16,7 +16,24 @@ function run(name, encoding = 'UTF-8', args = []) {
 for (const name of ['BilibiliExtraEventsFixture', 'BilibiliGiftMetadataFixture', 'BilibiliMainInteractionsFixture', 'BilibiliV2Fixture',
   'DouyinHandshakeFixture', 'ExpandedEventFixture', 'KuaishouAvatarFixture', 'KuaishouExtraEventsFixture',
   'PkEventsFixture', 'ViewerSnapshotsFixture']) {
-  run(name); console.log(`PASS ${name}`);
+  run(name);
+  if (name === 'PkEventsFixture') {
+    const { normalizeEvent } = require('../core/index.cjs');
+    const output = run(name, 'UTF-8', ['--emit-events']);
+    const normalized = output.trim().split(/\r?\n/).filter(Boolean).map(JSON.parse)
+      .map(row => normalizeEvent(row.event, row.platform, 'synthetic-pk-room'));
+    const bili = normalized.filter(event => event.platform === 'bilibili');
+    const douyin = normalized.filter(event => event.platform === 'douyin');
+    assert.ok(bili.some(event => event.pk.phase === 'preparing' && event.pk.participants[0].userId));
+    assert.ok(bili.some(event => event.pk.reason === 'battle-progress' && event.pk.participants.length === 2));
+    assert.ok(bili.some(event => event.pk.phase === 'ended'));
+    assert.ok(douyin.some(event => event.pk.reason === 'battle-progress' && event.pk.participants.some(p => typeof p.score === 'string')));
+    assert.ok(douyin.some(event => event.pk.participants.some(p => p.scoreDisplay && p.score === undefined)));
+    assert.ok(douyin.some(event => event.pk.phase === 'ended' && event.pk.participants.some(p => typeof p.score === 'string')));
+    assert.ok(normalized.every(event => event.count === 0 && event.count_mode === 'snapshot'));
+    console.log('PASS PK Java-to-Node wire compatibility');
+  }
+  console.log(`PASS ${name}`);
 }
 for (const encoding of ['GBK', 'UTF-8']) {
   const records = run('CollectorWireFixture', encoding).trim().split(/\r?\n/).map(JSON.parse);

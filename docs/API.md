@@ -116,7 +116,7 @@ const recent = live.history({ eventTypes: ['comment'] });
 | `room_stats` | 可选 `watching_count` 当前观看、`watched_count` 累计观看、`liked_count` 累计点赞；是状态值，不相加 |
 | `live_status` | 已知值包括 `started`、`ended`、视频号的 `waiting`；与采集连接状态分开处理 |
 | `viewer_snapshot` | `viewer_snapshot` 对象，见下文；不等价于全量在线名单 |
-| `pk_status` | `pk` 对象，见下文；当前没有完整比分和胜负能力 |
+| `pk_status` | `pk` 对象，见下文；B站支持基础对手与比分，抖音支持有明确依据的双人比分，均不覆盖所有 PK 模式 |
 
 礼物可选字段为 `gift_image_url/id`、`gift_price_raw`、`gift_price_unit`、`gift_coin_type`、`gift_unit`、`combo_id`、`receive_user_id/name`。徽章可选字段为 `badge_name`、`badge_level`。B站会员类礼物可有 `gift_kind='membership'`，及已知时的 `membership_action='purchase'|'renew'`。
 
@@ -126,11 +126,41 @@ const recent = live.history({ eventTypes: ['comment'] });
 
 ### 观众与 PK 快照
 
-`viewer_snapshot` 包含 `source`、`presenceEvidence`、`complete`、可选 `revision` 和 `viewers`。每个观众可有 `userId`、`userName`、`userLevel`、`wealthLevel`、`online`、`highWealth`。
+`viewer_snapshot` 包含 `source`、`presenceEvidence`、`complete`、可选 `revision` 和 `viewers`。每个观众可有 `userId`、`userName`、`userLevel`、`wealthLevel`、`online`、`highWealth`，以及合法的 `avatarUrl` / `avatarId` 和有来源依据的 `rank`（`1–500`）。缺失头像或名次不会补造，数组下标不是平台排名。
 
-当前快手可见名单标记为 `presenceEvidence='online-list'`，抖音贡献榜为 `'unknown'`；两者 `complete=false`。抖音当前适配读取 `ranksList`，不是所有座位或全部观众；核心也不保留榜单分数、名次和头像。缺失、消失或过期的观众条目不能证明完整离场，更不能由此计算所有人的精确停留时间。
+| 来源 | `source` / `presenceEvidence` | 实际范围 |
+| --- | --- | --- |
+| 快手 socket `340` | `kuaishou-live-watching-list` / `online-list` | 平台可见观众片段；保留明确的 `offline` 反向状态及 `tuhao` 标记，排除隐藏或占位身份 |
+| 抖音 `ranksList` | `douyin-contributor-rank` / `unknown` | 部分贡献榜，保留明确名次；不证明上榜用户此刻仍在线，不包含所有座位 |
+| 视频号后台 `online_member` | `wechat-online-member` / `online-list` | 后台本次返回的 `liveContacts`；只在当前房间已由消息确认后接收最新请求的名单 |
 
-`pk` 包含 `battleId`（可能为 `null`）、`phase='active'|'ended'`、`protocol`、`observedAt`，及可选 `reason`、`sourceTimestamp`、`sourceTime`、`revision`、`startedAt`、`endsAt`。毫秒时间与原始数字字符串分别保留，不猜未知单位。抖音只有协议同时提供可信开始时间与时长时才有 `endsAt`；快手没有倒计时。`reason='link-ended'` 表示快手连线结束证据，不表示已确定某一场 PK 的胜负；`battle-refresh` 不保证带有场次 ID。
+上述来源均为 `complete=false`，没有全量分页完成保证。视频号条目可能只有显示昵称和头像，没有可靠 `userId`；这种条目可供本次名单展示，不能按昵称连接到弹幕身份。名单不会产生 `enter` / `follow` / 离场事件，也不会自动填充弹幕的身份头像缓存。缺失、消失或过期的条目不能证明完整离场，更不能由此计算所有人的精确停留时间。
+
+快手 `340` 的 `displayWatchingCount` 可独立形成 `room_stats.watching_count`；只接收精确整数，保留明确的 `0`，忽略空值和“万”等缩写。名单长度不参与人数计算。
+
+`pk` 包含 `battleId`（部分协议可能为 `null`）、`phase='preparing'|'active'|'ended'`、`protocol`、`observedAt`，及可选 `reason`、`sourceTimestamp`、`sourceTime`、`revision`、`startedAt`、`endsAt`。毫秒时间与原始数字字符串分别保留，不猜未知单位。B站新增的基础 PK 命令如下：
+
+| `protocol` | `phase` / `reason` | `participants` |
+| --- | --- | --- |
+| `PK_BATTLE_PRE`、`PK_BATTLE_PRE_NEW` | `preparing` / `battle-preparing` | 一项 `side='opponent'`，含 `roomId`；可有 `userId`、`userName`、`avatarUrl` / `avatarId` |
+| `PK_BATTLE_START`、`PK_BATTLE_START_NEW` | `active` / `battle-started` | 可有 `side='init'|'match'` 的双方房间资料，及已提供的比分 |
+| `PK_BATTLE_PROCESS`、`PK_BATTLE_PROCESS_NEW` | `active` / `battle-progress` | 本条已提供的双方 `roomId` 和 `score` |
+| `PK_BATTLE_END` | `ended` / `battle-finished` | 本条已提供的双方房间与结束比分 |
+
+`participants` 最多两项，缺少的一方或比分不会补成零。B站 `score` 是精确的非负 uint64 十进制**字符串**，不是 Number；`scoreUnit` 是平台提供的可选单位文本，不换算成人民币。`init`、`match` 是协议方位，不能固定认作本方与对方；以参与者 `roomId` 和实际房间对应。准备阶段显式隐藏身份时省略用户资料。贡献者名字不会冒充主播资料。
+
+抖音还适配以下双人比分：
+
+| `protocol` / 条件 | `phase` / `reason` | 参与者与比分 |
+| --- | --- | --- |
+| `WebcastLinkMicMethod`，仅 `message_type=202` 且有明确、一致的场次 ID | `active` / `battle-progress` | `user_scores` 中最多两名唯一参与者 |
+| `WebcastLinkMicBattleFinishMethod`、`WebcastLinkmicBattleFinishMethod` | `ended` / `battle-finished` | 已有结束状态上补充 `BattleScore` 中的最终比分 |
+
+抖音参与者为 `side='participant'`，必有 `userId`；当前源字段没有房间 ID 时省略 `roomId`，不能按数组顺序推断本方。`score` 仍为十进制字符串：进度采用非负 int64，结束采用非负 int32，缺失保留未知。协议要求相对或模糊显示时，省略真实 `score`，只保留合法 `scoreDisplay`（最多 64 字符）；两者互斥，显示文本也不能解析成精确分数。
+
+检测到团队字段、超过两名参与者或身份冲突时，不发布双人比分；结束事件仍可保留有效结束状态而不带 `participants`。贡献者榜单与双方总分分别处理，不把榜单分数合计成主播比分。这不覆盖多方、团队、惩罚阶段及所有变体。
+
+PK 适配没有跨事件状态缓存。消费端按平台、房间及 `battleId` 合并资料与后续比分，并处理缺字段、乱序与结束；不要用旧场次头像或比分补进新场次。B站开始事件在有效字段齐全时提供 `startedAt` / `endsAt`；当前没有统一 `winner` / `result` 字段。抖音只有协议同时提供可信开始时间与时长时才有 `endsAt`；快手没有倒计时。`reason='link-ended'` 表示快手连线结束证据，不表示已确定某一场 PK 的胜负；`battle-refresh` 不保证带有场次 ID。
 
 ## 头像缓存与异步补全
 
@@ -151,7 +181,7 @@ async function readImage(live, event) {
 }
 ```
 
-`getAvatar()` 只读取核心已从事件或头像更新登记的 ID。无登记、下载失败、超时、队列已满或关闭后返回 `null`；不会向图片服务器发送平台 Cookie。下载仅限各平台允许的 CDN 和图片类型。消息进入核心时只登记 URL，不立即下载。
+`getAvatar()` 只读取核心已从事件或头像更新登记的 ID；也可传入 `viewer_snapshot.viewers[].avatarId` 或 `pk.participants[].avatarId`。无登记、被缓存容量淘汰、下载失败、超时、队列已满或关闭后返回 `null`；不会向图片服务器发送平台 Cookie。下载仅限各平台允许的 CDN 和图片类型。事件进入核心时只登记 URL，不立即下载；名单与 PK 头像共用同一个图片缓存上限。
 
 `gift_image_id` 和 `emotes[].id` 当前**没有自动登记**到 `live.getAvatar()`；不能将其当作通用图片代理。UI 可以使用对应的经过校验的 URL，并按自身环境设置图片加载和内容安全策略。
 
@@ -219,7 +249,7 @@ async function attachWechat({ BrowserWindow, session }) {
   await collector.connect({
     remember: false,
     onState: state => { /* awaiting-login、connected、message-error 等 */ },
-    onDiagnostic: metric => { /* giftCallbacks / giftParseErrors / observerErrors */ },
+    onDiagnostic: metric => { /* giftCallbacks / giftParseErrors / observerErrors 等计数 */ },
     onEvent(raw, roomId) {
       try {
         if (!rooms.has(roomId)) rooms.set(roomId, live.openRoom({ platform: 'wechat', roomId }));
@@ -250,6 +280,18 @@ async function attachWechat({ BrowserWindow, session }) {
 - `collector.focus()`：显示并聚焦现有后台窗口。
 
 纯解析可直接调用 `decodeWechatResponse(body, request?)`，从 `wechat/wechat-decoder.cjs` 导入。`body` 是 JSON 字符串；响应没有提供房间 ID 时，`request.liveId` 可作为后备；无效或冲突的房间标识会被拒绝。成功返回 `{ roomId, events, liveStatus, errors, giftCallbacks, giftParseErrors }`；未确认房间时返回空事件，登录或协议错误可能返回 `error='LOGIN_OR_PROTOCOL'`。非法 JSON、超大响应等会抛出异常。视频号原始身份和消息编号超过 128 字符时不会截断拼接成另一个身份；无可靠消息编号时留给核心生成独立标识。纯解析不创建连接、不去重，`liveStatus` 也需要调用方按状态变化处理；建议使用现成采集器接入核心。
+
+### 视频号礼物目录与在线名单
+
+`WechatCollector` 被动读取官方后台本来已经发出的 `live/gift_enum_list` 和 `live/online_member` 响应；不会主动请求目录、翻页或补拉名单。仅处理已知官方 HTTPS 路径、HTTP `200` 和有效返回结构，使用该请求的 `liveId` 绑定房间；元数据读取失败不会把正常弹幕连接标为失败。
+
+礼物图片取自 `data.giftList` 中的 `rewardProductId → thumbnailFileUrl`，只为同房间、同礼物 ID 的**后续**奖励事件补充 `gift_image_url`。原始礼物名称、数量、金额和消息 ID 不变；不按礼物名称模糊匹配，不重放旧礼物。仅接受当前白名单 `qpic.cn` / `qlogo.cn` 图片；未知 CDN、冲突映射或缺失字段保留未知。目录缓存每次连接独立，默认 30 分钟，最多 8 个房间、每房间 512 个图片映射；停止时清空。较旧目录不能覆盖较新目录。
+
+在线名单要求请求 `liveId` 与弹幕已确认的当前房间匹配，且是最新的名单请求；迟到旧房间或旧请求不会覆盖。有效空 `liveContacts` 会产生空的局部快照，不代表全直播间无人在线。名单不改变连接状态，不作为送礼或普通弹幕进入历史。
+
+辅助响应解析分别提供 `wechat/wechat-gifts.cjs` 的 `decodeWechatGiftCatalog(body, { liveId })`，返回 `{ roomId, gifts: Map }` 或 `null`；以及 `wechat/wechat-viewers.cjs` 的 `decodeWechatViewersResponse(body, { liveId })`，返回 `{ roomId, event }`，未接受时 `event=null`。超大或损坏响应可能抛出异常。纯解析函数不验证窗口当前房间或请求顺序，嵌入应用通常应使用采集器的现成接线。
+
+`onDiagnostic` 可另外收到 `giftCatalogErrors`、`viewerSnapshotErrors`。这些是受限读取或解析失败计数，不表示必须重连，也不保证每个被忽略的未知字段都产生诊断。
 
 ## 四平台并行
 
@@ -330,7 +372,9 @@ async function startFourPlatforms({
 | 快手资料缓存 / 风控 | 默认成功 30 分钟、失败 5 分钟、风控冷却 5 分钟；响应最多 128 KiB |
 | Java 配置 / 输出 | 配置最多 32768 字节；stdout 单行和未换行缓冲各最多 256 KiB |
 | 视频号响应 | 消息体最多 2 MiB；最多 4 个并发读取；每个消息数组最多处理前 2000 项 |
-| 观众 / 撤回列表 | 单次观众快照最多 500 项；SC 撤回 ID 最多 128 项 |
+| 视频号辅助响应 | 礼物目录与在线名单共用最多 32 个待处理请求记录、2 个并发响应读取；每体最多 2 MiB |
+| 视频号礼物目录 | 输入最多 2048 项；缓存最多 8 房间 × 每房间 512 个图片映射，30 分钟有效，停止时清空 |
+| 观众 / 撤回列表 | 单次观众快照最多 500 项；Java 名单 UTF-8 JSON 另限 192 KiB，必要时只保留前部条目；SC 撤回 ID 最多 128 项 |
 
 `profileOptions` 可配置 `spacingMs=1000`（`0–60000`）、`timeoutMs=5000`（`1–60000`）、`positiveTtlMs=1800000`、`negativeTtlMs=300000`、`cooldownMs=300000`（后三项均 `1–86400000`）、`maxEntries=2048`（`1–2048`）、`maxQueued=64`（`1–64`）。快手房间的 `roomId`、Cookie 与完成回调由房间会话设置。生产接入应保留合理间隔；多个房间的限速不是全局账号限速。
 

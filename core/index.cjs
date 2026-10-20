@@ -32,6 +32,10 @@ class LiveConnect extends ObserverSafeEmitter {
     this.closed = false;
     this.stream.on('event', event => {
       this.images.register(event);
+      for (const viewer of event.viewer_snapshot?.viewers || [])
+        this.images.register({ platform: event.platform, avatar_url: viewer.avatarUrl, avatar_id: viewer.avatarId });
+      for (const participant of event.pk?.participants || [])
+        this.images.register({ platform: event.platform, avatar_url: participant.avatarUrl, avatar_id: participant.avatarId });
       this.emit('event', event);
     });
     this.stream.on('viewer-avatar', event => {

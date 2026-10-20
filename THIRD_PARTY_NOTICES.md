@@ -32,6 +32,16 @@ The profile-avatar adapter is an original implementation of Kuaishou's HTTPS end
 
 Newer message endpoints and notice/live-status shapes were also checked against the official video-account assistant JavaScript build `26092402`, module `44704` / `updateAppList`: [official reference asset](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/969.9949886a.js). The upstream web application source and assets are not redistributed.
 
+## Protocol references added in 0.2.0
+
+The Bilibili PK adapter is an original implementation of wire-field descriptions checked against [qydysky/bili_danmu, commit 76304fa1c5e337d20837a2b346a3c2a90c680996](https://github.com/qydysky/bili_danmu/tree/76304fa1c5e337d20837a2b346a3c2a90c680996/Reply/ws_msg) and [ShmilyChen/bilive_client, commit c0d70369ef5b3128309201ffb0f65522b31d5444](https://github.com/ShmilyChen/bilive_client/blob/c0d70369ef5b3128309201ffb0f65522b31d5444/bilive/%40types/danmaku.d.ts). Both repositories declare MIT licenses. No upstream implementation is vendored.
+
+WeChat gift-catalog and visible-viewer fields were checked against the official assistant's public static resources: [794.72f12fb9.js](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/794.72f12fb9.js), [805.b6dd9a5a.js](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/805.b6dd9a5a.js), and [185.50f45423.js](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/185.50f45423.js). Their code, assets and live responses are not redistributed. The older `wordweb/Get-Tencent-Video-Live-Barrage-Gifts` repository was used only as an endpoint lead; no license was found and no code was copied from it.
+
+The Kuaishou viewer changes use OrdinaryRoad's existing protocol classes, cross-checked against the official public `app.1241f9804c38413b871f.js` and `liveRoom.1241f9804c38413b871f.js` resources under `https://p2-game.kskwai.com/udata/pkg/KS-GAME-WEB/pc-live-next/js/`. No official source, runtime asset or account data is bundled.
+
+The Douyin pair-score adapter independently reads the wire fields and UPDATE discriminator confirmed by the official public [live-schema-im.e322bd8a.js](https://lf-webcast-platform.bytetos.com/obj/webcast-platform-cdn/webcast/douyin_live/chunks/live-schema-im.e322bd8a.js), [PKViewPlugin.de2e4662.js](https://lf-webcast-platform.bytetos.com/obj/webcast-platform-cdn/webcast/douyin_live/chunks/PKViewPlugin.de2e4662.js), and [client-entry~1.28f20eec.js](https://lf-webcast-platform.bytetos.com/obj/webcast-platform-cdn/webcast/douyin_live/client-entry~1.28f20eec.js). Official code and assets are not redistributed. TikTok's same-named messages are not used as evidence of Douyin compatibility.
+
 ## Downloaded build/runtime dependencies
 
 Maven and npm resolve transitive dependencies separately under their respective licenses. Electron is used only as a development/runtime dependency for the example. Consult dependency POMs and the JAR `META-INF` license/notice files and Electron notices before redistributing any binaries. No Java runtime, source archive, or dependency binary is distributed by this source repository.

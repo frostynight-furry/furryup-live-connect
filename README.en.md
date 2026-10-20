@@ -4,7 +4,7 @@
 
 Open-source livestream event adapters for **Bilibili, Douyin, Kuaishou and WeChat Channels**. Build your own chat overlays, interactive pets, OBS components or streaming tools using a shared Node.js event interface.
 
-Version **0.1.1** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
+Version **0.2.0** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
 
 ## Try the offline demo
 
@@ -51,9 +51,13 @@ Avatar updates are metadata, not repeated chat or gift events. Kuaishou profile 
 ## Scope and limitations
 
 - Comments, viewer fields and gift events are normalized; optional fields vary by platform.
+- Basic Bilibili PK now includes preparation, start, exact score strings, finish and opponent metadata. It does not infer winners or cover every battle mode.
+- Douyin adds verified two-participant score updates and finish scores. Relative or blurred scores remain display text, and team/multi-party modes are not treated as ordinary pair totals.
+- WeChat gift thumbnails are mapped from the authorized backend's observed gift catalog. Partial visible viewer snapshots are read from its online-member response; this is not a full audience list.
+- Kuaishou/Douyin viewer snapshots preserve validated images and source ranks where supplied, while filtering hidden identities.
 - Gift deltas, combo totals, room statistics and like signals have different meanings. Do not add snapshots to interaction counters.
 - Full online viewer lists, complete PK data and disconnected-message backfill are not guaranteed. See the [capability table](README.md#当前数据能力).
-- Protocol research listed in the roadmap is not implemented support. Platform changes may break community adapters.
+- The roadmap distinguishes implemented adapters from unresolved protocol research. New adapters have synthetic regression coverage; live-room coverage still requires authorized validation. Platform changes may break community adapters.
 - The SDK does not collect telemetry or install a background updater. Dependency upgrades require a rebuild and testing.
 
 ## Validate and contribute

@@ -2,6 +2,8 @@
 const { randomUUID } = require('node:crypto');
 const { ObserverSafeEmitter } = require('../core/event-stream.cjs');
 const { decodeWechatResponse, isMessageUrl, LIVE_URL, MAX_BODY } = require('./wechat-decoder.cjs');
+const { isGiftCatalogUrl, metadataRoomId, WechatGiftCatalog } = require('./wechat-gifts.cjs');
+const { isViewerListUrl, decodeWechatViewersResponse } = require('./wechat-viewers.cjs');
 const MAX_LOGIN_BODY = 256 * 1024;
 const AUTH_STAGES = new Map([
   ['/cgi-bin/mmfinderassistant-bin/auth/auth_with_oauth', 'oauth'],
@@ -94,6 +96,8 @@ class WechatCollector extends ObserverSafeEmitter {
     if (generation !== this.connectGeneration) return;
     const run = { active: true, closing: false, remember, restored: false, reused: Boolean(remember && retainedSession), loginSessionReported: false, onState, onEvent, onDiagnostic,
       requests: new Map(), authRequests: new Map(), authInFlight: 0, savedTimer: null, saving: Promise.resolve(), inFlight: 0,
+      metadataRequests: new Map(), metadataInFlight: 0, metadataOrder: 0, latestViewerOrder: 0,
+      giftCatalog: new WechatGiftCatalog(), messageRoomId: '',
       statusSessionId: randomUUID(), statusSequence: 0, statusRoomId: '', liveStatus: '', requestOrder: 0, lastStatusRequestOrder: 0 };
     this.run = run;
     run.cancelled = new Promise(resolve => { run.cancel = resolve; });
@@ -223,6 +227,70 @@ class WechatCollector extends ObserverSafeEmitter {
       if (run.active) this.loginDiagnostic(summary);
     }
   }
+  async metadataResponse(run, id, encodedDataLength) {
+    const request = run.metadataRequests.get(id); run.metadataRequests.delete(id);
+    if (!request?.ready) return;
+    const diagnostic = request.kind === 'gifts' ? 'giftCatalogErrors' : 'viewerSnapshotErrors';
+    if (encodedDataLength > MAX_BODY || run.metadataInFlight >= 2) {
+      this.notify(run, 'onDiagnostic', diagnostic); return;
+    }
+    run.metadataInFlight++;
+    try {
+      const response = await run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id });
+      if (!run.active) return;
+      if (typeof response.body !== 'string' || response.body.length > MAX_BODY * 1.4) throw new Error('Invalid metadata body');
+      const body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString('utf8') : response.body;
+      if (request.kind === 'gifts') {
+        run.giftCatalog.ingest(body, request);
+      } else {
+        // A list is a partial snapshot of one current room, never a reconnect or
+        // live-status signal. Do not let an earlier request switch rooms back.
+        if (request.order !== run.latestViewerOrder || request.liveId !== run.messageRoomId) return;
+        const decoded = decodeWechatViewersResponse(body, request);
+        if (decoded.event && decoded.roomId === run.messageRoomId) {
+          this.notify(run, 'onEvent', { ...decoded.event,
+            source_msg_id: `viewers:${run.statusSessionId}:${request.order}` }, decoded.roomId);
+        }
+      }
+    } catch {
+      if (run.active) this.notify(run, 'onDiagnostic', diagnostic);
+    } finally { run.metadataInFlight--; }
+  }
+  metadataMessage(run, method, params) {
+    const id = params.requestId;
+    const kindFor = url => isGiftCatalogUrl(url) ? 'gifts' : isViewerListUrl(url) ? 'viewers' : '';
+    if (method === 'Network.requestWillBeSent') {
+      // Redirects reuse a CDP request ID. Never keep an allowlisted route for a
+      // redirected response or a request whose body no longer identifies a room.
+      run.metadataRequests.delete(id);
+      const kind = kindFor(params.request?.url);
+      if (!kind) return false;
+      let input;
+      try { if (params.request.postData?.length <= 64 * 1024) input = JSON.parse(params.request.postData); } catch {}
+      const liveId = metadataRoomId(input?.liveId);
+      if (liveId) {
+        const order = ++run.metadataOrder;
+        run.metadataRequests.set(id, { kind, liveId, order, ready: false });
+        if (kind === 'viewers') run.latestViewerOrder = order;
+        while (run.metadataRequests.size > 32) run.metadataRequests.delete(run.metadataRequests.keys().next().value);
+      }
+      return true;
+    }
+    if (method === 'Network.responseReceived') {
+      const kind = kindFor(params.response?.url), request = run.metadataRequests.get(id);
+      if (!kind && !request) return false;
+      if (!request || request.kind !== kind || params.response.status !== 200) run.metadataRequests.delete(id);
+      else request.ready = true;
+      return true;
+    }
+    if (method === 'Network.loadingFailed') {
+      return run.metadataRequests.delete(id);
+    }
+    if (method === 'Network.loadingFinished' && run.metadataRequests.has(id)) {
+      return this.metadataResponse(run, id, params.encodedDataLength).then(() => true);
+    }
+    return false;
+  }
   async networkMessage(run, method, params) {
     if (!run.active) return;
     const id = params.requestId;
@@ -239,6 +307,8 @@ class WechatCollector extends ObserverSafeEmitter {
       const auth = run.authRequests.get(id); run.authRequests.delete(id);
       if (auth) this.loginDiagnostic({ kind: 'auth', ...auth });
     }
+    const metadata = this.metadataMessage(run, method, params);
+    if (metadata) { await metadata; return; }
     if (method === 'Network.requestWillBeSent' && isMessageUrl(params.request?.url)) {
       let request = {};
       try { if (params.request.postData?.length <= 64 * 1024) request = JSON.parse(params.request.postData); } catch { }
@@ -277,6 +347,7 @@ class WechatCollector extends ObserverSafeEmitter {
         if (!run.active) return;
         const currentSnapshot = request.order >= run.lastStatusRequestOrder;
         if (currentSnapshot) {
+          run.messageRoomId = decoded.roomId;
           this.notifyRequestState(run, request, { state: 'connected', roomId: decoded.roomId, error: '' });
           if (!run.active) return;
           if (decoded.liveStatus && (run.statusRoomId !== decoded.roomId || run.liveStatus !== decoded.liveStatus)) {
@@ -290,7 +361,7 @@ class WechatCollector extends ObserverSafeEmitter {
         for (const event of decoded.events) {
           if (!run.active) break;
           if (event.event_type === 'room_stats' && !currentSnapshot) continue;
-          this.notify(run, 'onEvent', event, decoded.roomId);
+          this.notify(run, 'onEvent', run.giftCatalog.enrich(event, decoded.roomId), decoded.roomId);
         }
         if (decoded.errors) this.notifyRequestState(run, request, { error: '已忽略无法解析的视频号互动；其余消息继续接收。' });
       } catch {
@@ -345,6 +416,7 @@ class WechatCollector extends ObserverSafeEmitter {
     const run = this.run;
     if (!run) { if (!preserveSession) await this.clearRetainedSession(); return; }
     this.run = null; run.active = false; run.cancel(); clearTimeout(run.savedTimer);
+    run.metadataRequests.clear(); run.giftCatalog.clear();
     run.session.cookies.removeListener('changed', run.cookiesChanged || (() => {}));
     if (run.window && !run.window.isDestroyed()) run.window.destroy();
     this.stopping = (async () => {
