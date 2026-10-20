@@ -14,6 +14,30 @@ const optionalText = (value, max) => typeof value === 'string' ? clean(value, ma
 const viewerId = value => typeof value === 'number'
   ? Number.isSafeInteger(value) && value > 0 ? String(value) : ''
   : typeof value === 'string' && value.length <= 128 && value === value.trim() && !/[\u0000-\u001f\u007f]/.test(value) ? value : '';
+const messageId = value => typeof value === 'number'
+  ? Number.isSafeInteger(value) && value >= 0 ? String(value) : ''
+  : typeof value === 'string' && value.length <= 512 && value === value.trim() && !/[\u0000-\u001f\u007f]/.test(value) ? value : '';
+
+// An observer failure must not prevent other subscribers from receiving an
+// already accepted event. Preserve EventEmitter's once/off ordering, but report
+// only a fixed code and channel, never application exception text or event data.
+class ObserverSafeEmitter extends EventEmitter {
+  emit(channel, ...args) {
+    if (!['event', 'viewer-avatar', 'observer-error'].includes(channel)) return super.emit(channel, ...args);
+    const listeners = this.rawListeners(channel);
+    const failed = () => {
+      if (channel !== 'observer-error')
+        this.emit('observer-error', Object.freeze({ channel, code: 'OBSERVER_CALLBACK_FAILED' }));
+    };
+    for (const listener of listeners) {
+      try {
+        const result = listener.apply(this, args);
+        if (typeof result?.then === 'function') Promise.resolve(result).catch(failed);
+      } catch { failed(); }
+    }
+    return listeners.length > 0;
+  }
+}
 const nonnegativeCount = (value, max = 1_000_000_000_000) => {
   // The SDK exposes some room counters as decimal strings. Do not parse rounded
   // display text such as "1.2万" or values beyond JavaScript's exact range.
@@ -87,7 +111,7 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
   if (isStats && !Object.keys(stats).length) throw new Error('房间统计无效');
   const liveStatus = optionalText(raw.live_status, 64);
   if (raw.event_type === 'live_status' && !liveStatus) throw new Error('直播状态无效');
-  const explicitSuperChatId = optionalText(raw.super_chat_id, 20);
+  const explicitSuperChatId = typeof raw.super_chat_id === 'string' && raw.super_chat_id.length <= 20 ? raw.super_chat_id : undefined;
   const superChatId = explicitSuperChatId && /^[1-9]\d{0,19}$/.test(explicitSuperChatId) ? explicitSuperChatId :
     (raw.event_type === 'super_chat' && /^bili-super-chat:[1-9]\d{0,19}$/.test(raw.source_msg_id || '') ? raw.source_msg_id.slice(16) : undefined);
   let superChatIds;
@@ -102,8 +126,8 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
       return id;
     }))];
   }
-  const sourceId = String(raw.event_id || raw.source_msg_id || randomUUID());
-  if (sourceId.length > 512 || /[\u0000-\u001f\u007f]/.test(sourceId)) throw new TypeError('Invalid source message identity');
+  const sourceMessageId = messageId(raw.source_msg_id);
+  const sourceId = messageId(raw.event_id) || sourceMessageId || randomUUID();
   const giftImage = avatarInfo(raw.gift_image_url, platform);
   const rich = {};
   if (isPk) rich.pk = normalizePk(raw.pk, platform);
@@ -114,8 +138,7 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
         typeof value.source !== 'string' || !value.source.trim()) throw new Error('观众名单数据无效');
     const viewers = value.viewers.map(viewer => {
       if (!viewer || typeof viewer !== 'object' || Array.isArray(viewer)) throw new Error('观众数据无效');
-      const userId = typeof viewer.userId === 'string' ? optionalText(viewer.userId, 128) :
-        Number.isSafeInteger(viewer.userId) && viewer.userId > 0 ? String(viewer.userId) : undefined;
+      const userId = viewerId(viewer.userId);
       const userLevel = nonnegativeCount(viewer.userLevel, 1000);
       const wealthLevel = nonnegativeCount(viewer.wealthLevel, 1000);
       return Object.freeze({ ...(userId ? { userId } : {}), userName: optionalText(viewer.userName, 64) || '一位朋友',
@@ -129,8 +152,12 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
       viewers: Object.freeze(viewers) });
   }
   for (const [field, max] of Object.entries({ badge_name: 64, gift_price_unit: 32, gift_coin_type: 32, gift_unit: 16, super_chat_price_unit: 32,
-    receive_user_id: 128, receive_user_name: 64, combo_id: 128 })) {
+    receive_user_name: 64 })) {
     const value = optionalText(raw[field], max);
+    if (value) rich[field] = value;
+  }
+  for (const field of ['receive_user_id', 'combo_id']) {
+    const value = viewerId(raw[field]);
     if (value) rich[field] = value;
   }
   for (const [field, max] of Object.entries({ badge_level: 1000, super_chat_duration: 86_400 })) {
@@ -154,7 +181,7 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
   return Object.freeze({
     schemaVersion: 1,
     event_id: `${preview ? 'preview' : 'live'}:${platform}:${encodeURIComponent(roomId)}:${encodeURIComponent(sourceId)}`,
-    source_msg_id: clean(raw.source_msg_id),
+    source_msg_id: sourceMessageId,
     platform, room_id: roomId, event_type: raw.event_type,
     source: preview ? 'simulation' : isStats && platform === 'bilibili' && raw.stats_source === 'bilibili-online-rank-api'
       ? 'bilibili-online-rank-api' : platform === 'wechat' ? 'wechat-backstage' : 'ordinaryroad', preview,
@@ -162,7 +189,7 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
     ...(raw.user_identity_hidden === true ? { user_identity_hidden: true } : {}),
     ...avatarInfo(raw.avatar_url, platform),
     content: clean(raw.content, 1000),
-    emotes: Object.freeze(normalizeEmotes(raw.emotes, platform, clean(raw.content, 1000))), gift_id: clean(raw.gift_id),
+    emotes: Object.freeze(normalizeEmotes(raw.emotes, platform, clean(raw.content, 1000))), gift_id: viewerId(raw.gift_id),
     gift_name: clean(raw.gift_name || '未知礼物', 100),
     gift_count: raw.event_type === 'gift' ? count : 0, count,
     count_mode: isStats || isViewers || isPk ? 'snapshot' : platform === 'wechat' && raw.event_type === 'like' ? 'signal' : 'delta', value: null,
@@ -174,7 +201,7 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
   });
 }
 
-class LiveEventStream extends EventEmitter {
+class LiveEventStream extends ObserverSafeEmitter {
   constructor() { super(); this.seen = new Map(); this.history = []; this.sequence = 0; this.accepted = 0; this.duplicates = 0; }
   push(raw, platform, roomId, preview = false, enrichAvatar) {
     const event = normalizeEvent(raw, platform, roomId, preview);
@@ -226,4 +253,4 @@ class LiveEventStream extends EventEmitter {
     }
   }
 }
-module.exports = { PLATFORMS, EVENT_TYPES, LiveEventStream, normalizeEvent, validateRoute };
+module.exports = { PLATFORMS, EVENT_TYPES, LiveEventStream, normalizeEvent, validateRoute, ObserverSafeEmitter };

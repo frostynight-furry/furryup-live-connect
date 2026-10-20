@@ -148,3 +148,81 @@ test('identity normalization never truncates or rounds a viewer ID before profil
   assert.ok(numeric.ingest(comment('string', { user_id: '12345' })).avatar_id);
   assert.equal(hub.stream.updateViewerAvatar({ platform: 'kuaishou', event_type: 'comment', user_id: 12345 }, {}), false);
 });
+
+test('failing subscribers cannot lose accepted events or metadata, including direct and once listeners', async t => {
+  const hub = createLiveConnect(); t.after(() => hub.close());
+  const room = hub.openRoom({ platform: 'kuaishou', roomId: 'room' });
+  const received = [], metadata = [], diagnostics = [];
+  const fail = () => { throw new Error('PRIVATE_ACCOUNT_COOKIE'); };
+  hub.subscribe(fail);
+  hub.on('event', async () => { throw new Error('PRIVATE_ASYNC_ACCOUNT'); });
+  let onceCalls = 0;
+  hub.once('event', () => { onceCalls++; fail(); });
+  hub.subscribe(event => received.push(event));
+  hub.stream.on('event', fail);
+  hub.on('observer-error', fail);
+  hub.on('observer-error', async () => { throw new Error('PRIVATE_DIAGNOSTIC'); });
+  hub.on('observer-error', value => diagnostics.push(value));
+  hub.subscribeAvatars(fail);
+  hub.subscribeAvatars(update => metadata.push(update));
+  const first = room.ingest(comment('first'));
+  room.ingest(comment('second'));
+  assert.equal(hub.stream.updateViewerAvatar(first, { avatar_url: avatar }), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(received.map(event => event.source_msg_id), ['first', 'second']);
+  assert.equal(onceCalls, 1);
+  assert.equal(metadata.length, 1);
+  assert.equal(hub.stream.accepted, 2);
+  assert.equal(room.ingest(comment('first')), null);
+  assert.ok(diagnostics.some(value => value.channel === 'event'));
+  assert.ok(diagnostics.some(value => value.channel === 'viewer-avatar'));
+  assert.ok(diagnostics.every(value => value.code === 'OBSERVER_CALLBACK_FAILED' &&
+    Object.keys(value).sort().join() === 'channel,code'));
+  assert.doesNotMatch(JSON.stringify(diagnostics), /PRIVATE/);
+});
+
+test('public subscriptions return asynchronous failures to isolation without treating ordinary results as promises', async t => {
+  const hub = createLiveConnect(); t.after(() => hub.close());
+  const room = hub.openRoom({ platform: 'kuaishou', roomId: 'room' });
+  const diagnostics = [], events = [], avatars = [];
+  hub.on('observer-error', value => diagnostics.push(value));
+  hub.subscribe(async () => { throw new Error('PRIVATE_SUBSCRIPTION'); });
+  hub.subscribeAvatars(async () => { throw new Error('PRIVATE_AVATAR_SUBSCRIPTION'); });
+  hub.subscribe(() => ({ then: 42 }));
+  hub.once('event', () => Object.defineProperty({}, 'then', {
+    get() { throw new Error('PRIVATE_THEN_GETTER'); }
+  }));
+  hub.subscribe(event => events.push(event));
+  hub.subscribeAvatars(event => avatars.push(event));
+  const event = room.ingest(comment('async-public'));
+  assert.equal(hub.stream.updateViewerAvatar(event, { avatar_url: avatar }), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(events.length, 1);
+  assert.equal(avatars.length, 1);
+  assert.equal(hub.stream.accepted, 1);
+  assert.deepEqual(diagnostics.map(value => value.channel).sort(), ['event', 'event', 'viewer-avatar']);
+  assert.ok(diagnostics.every(value => value.code === 'OBSERVER_CALLBACK_FAILED'));
+  assert.doesNotMatch(JSON.stringify(diagnostics), /PRIVATE/);
+});
+
+test('message and snapshot identities remain exact or are discarded rather than aliased', t => {
+  const hub = createLiveConnect(); t.after(() => hub.close());
+  const room = hub.openRoom({ platform: 'wechat', roomId: 'room' });
+  const prefix = 'x'.repeat(128);
+  const first = room.ingest(comment(prefix + 'a'));
+  const second = room.ingest(comment(prefix + 'b'));
+  assert.notEqual(first.event_id, second.event_id);
+  assert.notEqual(first.source_msg_id, second.source_msg_id);
+  for (const source_msg_id of ['x'.repeat(513), Number.MAX_SAFE_INTEGER + 1, {}, 'bad\nidentity']) {
+    const a = room.ingest(comment(source_msg_id)), b = room.ingest(comment(source_msg_id));
+    assert.equal(a.source_msg_id, '');
+    assert.notEqual(a.event_id, b.event_id);
+  }
+  const snapshot = room.ingest({ event_type: 'viewer_snapshot', viewer_snapshot: {
+    source: 'synthetic', presenceEvidence: 'unknown', complete: false,
+    viewers: [{ userId: prefix + 'a' }, { userId: prefix + 'b' }]
+  } });
+  assert.ok(snapshot.viewer_snapshot.viewers.every(viewer => viewer.userId === undefined));
+  const sc = normalizeEvent({ event_type: 'super_chat', super_chat_id: '1'.repeat(21) }, 'bilibili', 'room');
+  assert.equal(sc.super_chat_id, undefined);
+});

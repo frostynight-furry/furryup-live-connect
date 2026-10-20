@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞私密报告
+    url: https://github.com/frostynight-furry/furryup-live-connect/security/advisories/new
+    about: 请通过私密入口报告漏洞，不要在公开 Issue 中暴露利用细节或凭据。
+  - name: FurryUP Studio 产品下载与说明
+    url: https://github.com/frostynight-furry/furryup-studio-releases
+    about: 完整主播端产品的安装包和说明；本仓库维护独立采集底层。

@@ -11,7 +11,9 @@ npm run build
 npm test
 ```
 
-纯 Node 变更可以先运行 `npm run test:core` 与 `npm run test:wechat`。新增源码还须更新 `scripts/audit-source.cjs` 的逐文件白名单。CI 不连接真实直播间。
+纯 Node 变更可以先运行 `npm run test:core`、`npm run test:wechat` 与 `npm run test:examples`。`npm run demo` 可离线体验四平台合成事件。新增源码还须更新 `scripts/audit-source.cjs` 的逐文件白名单，暂存后运行 `node scripts/audit-source.cjs --tracked` 检查实际 Git 文件。CI 在 Windows / Linux、Node.js 22 / 24 上构建和测试，不连接真实直播间。
+
+阅读 [API 文档](docs/API.md) 理解字段和资源生命周期，[路线图](docs/ROADMAP.md)区分协议线索与实际支持。请通过仓库 Issue 表单提交问题或功能建议，PR 使用对应模板记录行为与验证。欢迎贡献[社区案例](docs/SHOWCASE.md)。
 
 ## 数据语义
 

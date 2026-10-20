@@ -1,5 +1,6 @@
 'use strict';
 const { randomUUID } = require('node:crypto');
+const { ObserverSafeEmitter } = require('../core/event-stream.cjs');
 const { decodeWechatResponse, isMessageUrl, LIVE_URL, MAX_BODY } = require('./wechat-decoder.cjs');
 const MAX_LOGIN_BODY = 256 * 1024;
 const AUTH_STAGES = new Map([
@@ -58,11 +59,31 @@ function cookieDetails(cookie) {
 const PAGE_LOAD_ERROR = '视频号后台暂时无法打开，请检查网络并在后台窗口刷新，或断开后重新连接。';
 // The remote page never receives a preload or Node privileges. Persistence is
 // supplied by the embedding application; the example disables it entirely.
-class WechatCollector {
+class WechatCollector extends ObserverSafeEmitter {
   constructor({ BrowserWindow, session, credentials, showWindows = true, onLoginDiagnostic = () => {} }) {
+    super();
     this.BrowserWindow = BrowserWindow; this.sessionApi = session; this.credentials = credentials;
     this.onLoginDiagnostic = onLoginDiagnostic;
     this.showWindows = showWindows; this.run = null; this.stopping = null; this.retainedSession = null; this.connectGeneration = 0;
+  }
+  notify(run, channel, ...args) {
+    if (!run.active || typeof run[channel] !== 'function') return;
+    const failed = () => {
+      if (!run.active) return;
+      this.emit('observer-error', Object.freeze({ channel, code: 'OBSERVER_CALLBACK_FAILED' }));
+      // A broken diagnostic callback is reported through observer-error only;
+      // calling it again would recursively report its own failure.
+      if (channel !== 'onDiagnostic') this.notify(run, 'onDiagnostic', 'observerErrors');
+    };
+    try {
+      const result = run[channel](...args);
+      if (typeof result?.then === 'function') Promise.resolve(result).catch(failed);
+    } catch { failed(); }
+  }
+  notifyRequestState(run, request, state) {
+    if (!run.active || request.order < run.lastStatusRequestOrder) return;
+    run.lastStatusRequestOrder = request.order;
+    this.notify(run, 'onState', state);
   }
   async connect({ remember = true, onState, onEvent, onDiagnostic = () => {} }) {
     const generation = ++this.connectGeneration;
@@ -109,22 +130,22 @@ class WechatCollector {
       wc.on('will-redirect', (event, url) => { if (!allowedPage(url)) event.preventDefault(); });
       wc.on('did-navigate', (_event, url) => {
         if (run.active && allowedPage(url) && /\/login(?:\.html$|[/?-]|$)/.test(new URL(url).pathname)) {
-          onState({ state: 'awaiting-login', error: '请在视频号后台扫码登录，再进入自己的直播间。' });
+          this.notify(run, 'onState', { state: 'awaiting-login', error: '请在视频号后台扫码登录，再进入自己的直播间。' });
         }
       });
       wc.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
         // A login redirect intentionally cancels the previous document load.
         // Subresource failures also do not invalidate the login page itself.
         if (run.active && isMainFrame && code !== -3) {
-          onState({ state: 'message-error', errorCode: 'WECHAT_PAGE_LOAD', error: PAGE_LOAD_ERROR });
+          this.notify(run, 'onState', { state: 'message-error', errorCode: 'WECHAT_PAGE_LOAD', error: PAGE_LOAD_ERROR });
         }
       });
-      wc.on('render-process-gone', () => { if (run.active) { onState({ state: 'connect-failed', error: '视频号后台页面异常退出，请断开后重新连接。' }); void this.stop(); } });
+      wc.on('render-process-gone', () => { if (run.active) { this.notify(run, 'onState', { state: 'connect-failed', error: '视频号后台页面异常退出，请断开后重新连接。' }); void this.stop(); } });
       window.on('close', () => { run.closing = true; });
       wc.on('will-prevent-unload', () => { run.closing = false; });
       window.on('closed', () => {
         if (!run.active) return;
-        onState({ state: 'stopped', error: '视频号后台窗口已关闭，采集已停止。' });
+        this.notify(run, 'onState', { state: 'stopped', error: '视频号后台窗口已关闭，采集已停止。' });
         void this.stop({ preserveSession: true });
       });
       run.cookiesChanged = () => {
@@ -142,13 +163,14 @@ class WechatCollector {
       if (!run.active) return;
       wc.debugger.attach('1.3');
       wc.debugger.on('detach', () => {
-        if (run.active && !run.closing) { onState({ state: 'connect-failed', error: '视频号消息监听已断开，请断开后重新连接。' }); void this.stop(); }
+        if (run.active && !run.closing) { this.notify(run, 'onState', { state: 'connect-failed', error: '视频号消息监听已断开，请断开后重新连接。' }); void this.stop(); }
       });
       wc.debugger.on('message', (_event, method, params) => { void this.networkMessage(run, method, params); });
       await Promise.race([wc.debugger.sendCommand('Network.enable', { maxTotalBufferSize: MAX_BODY * 2, maxResourceBufferSize: MAX_BODY }), run.cancelled]);
       if (!run.active) return;
       stage = 'page-load';
-      onState({ state: 'awaiting-login', error: '请在打开的视频号后台扫码登录，并进入自己的直播间。' });
+      this.notify(run, 'onState', { state: 'awaiting-login', error: '请在打开的视频号后台扫码登录，并进入自己的直播间。' });
+      if (!run.active) return;
       await Promise.race([window.loadURL(LIVE_URL), run.cancelled]);
     } catch (error) {
       this.reportLoginSession(run);
@@ -157,14 +179,14 @@ class WechatCollector {
         if (aborted && allowedPage(run.window.webContents.getURL())) return;
         // Leave Chromium's error page open so a refresh can recover without
         // discarding the debugger, transient login session, or collector run.
-        onState({ state: 'message-error', errorCode: 'WECHAT_PAGE_LOAD', error: PAGE_LOAD_ERROR });
+        this.notify(run, 'onState', { state: 'message-error', errorCode: 'WECHAT_PAGE_LOAD', error: PAGE_LOAD_ERROR });
         return;
       }
       const errors = { 'login-record': '视频号登录记录无法读取，请清除登录记录后重新扫码。',
         'browser-window': '视频号后台窗口未能启动，请重启采集示例后重试。',
         'message-listener': '视频号消息监听未能启动，请重启采集示例后重试。',
         'page-load': '视频号后台无法打开，请检查网络后重新连接。' };
-      if (run.active) onState({ state: 'connect-failed', errorCode: `WECHAT_${stage.toUpperCase().replaceAll('-', '_')}`, error: errors[stage] });
+      if (run.active) this.notify(run, 'onState', { state: 'connect-failed', errorCode: `WECHAT_${stage.toUpperCase().replaceAll('-', '_')}`, error: errors[stage] });
       if (this.run === run) await this.stop();
     }
   }
@@ -229,14 +251,15 @@ class WechatCollector {
       request.ready = params.response.status === 200;
       run.requests.set(id, request);
       while (run.requests.size > 128) run.requests.delete(run.requests.keys().next().value);
-      if (!request.ready) run.onState({ state: 'message-error', error: '视频号消息请求未成功，请在后台检查登录、验证和开播状态。' });
+      if (!request.ready) this.notifyRequestState(run, request, { state: 'message-error', error: '视频号消息请求未成功，请在后台检查登录、验证和开播状态。' });
     } else if (method === 'Network.loadingFailed') {
-      if (run.requests.delete(id)) run.onState({ state: 'message-error', error: '视频号消息请求中断，等待后台继续获取；若持续异常，请重新连接。' });
+      const request = run.requests.get(id); run.requests.delete(id);
+      if (request) this.notifyRequestState(run, request, { state: 'message-error', error: '视频号消息请求中断，等待后台继续获取；若持续异常，请重新连接。' });
     } else if (method === 'Network.loadingFinished') {
       const request = run.requests.get(id); run.requests.delete(id);
       if (!request?.ready) return;
       if (params.encodedDataLength > MAX_BODY || run.inFlight >= 4) {
-        run.onState({ state: 'message-error', error: '已忽略过大或过密的视频号响应。' }); return;
+        this.notifyRequestState(run, request, { state: 'message-error', error: '已忽略过大或过密的视频号响应。' }); return;
       }
       run.inFlight++;
       try {
@@ -246,26 +269,32 @@ class WechatCollector {
         const body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString('utf8') : response.body;
         const decoded = decodeWechatResponse(body, request);
         if (decoded.error) {
-          run.onState({ state: 'message-error', error: '视频号后台未返回有效消息，请检查登录、验证和开播状态。' }); return;
+          this.notifyRequestState(run, request, { state: 'message-error', error: '视频号后台未返回有效消息，请检查登录、验证和开播状态。' }); return;
         }
         if (!decoded.roomId) return;
-        for (let i = 0; i < decoded.giftCallbacks; i++) run.onDiagnostic('giftCallbacks');
-        for (let i = 0; i < decoded.giftParseErrors; i++) run.onDiagnostic('giftParseErrors');
-        run.onState({ state: 'connected', roomId: decoded.roomId, error: '' });
-        if (decoded.liveStatus && request.order >= run.lastStatusRequestOrder) {
-          run.lastStatusRequestOrder = request.order;
-          if (run.statusRoomId !== decoded.roomId || run.liveStatus !== decoded.liveStatus) {
+        for (let i = 0; i < decoded.giftCallbacks && run.active; i++) this.notify(run, 'onDiagnostic', 'giftCallbacks');
+        for (let i = 0; i < decoded.giftParseErrors && run.active; i++) this.notify(run, 'onDiagnostic', 'giftParseErrors');
+        if (!run.active) return;
+        const currentSnapshot = request.order >= run.lastStatusRequestOrder;
+        if (currentSnapshot) {
+          this.notifyRequestState(run, request, { state: 'connected', roomId: decoded.roomId, error: '' });
+          if (!run.active) return;
+          if (decoded.liveStatus && (run.statusRoomId !== decoded.roomId || run.liveStatus !== decoded.liveStatus)) {
             run.statusRoomId = decoded.roomId; run.liveStatus = decoded.liveStatus;
             // Room status has no platform message ID. A run-local sequence keeps
             // repeated snapshots quiet while retaining later stop/start cycles.
-            run.onEvent({ event_type: 'live_status', live_status: decoded.liveStatus,
+            this.notify(run, 'onEvent', { event_type: 'live_status', live_status: decoded.liveStatus,
               source_msg_id: `status:${run.statusSessionId}:${++run.statusSequence}:${decoded.liveStatus}` }, decoded.roomId);
           }
         }
-        for (const event of decoded.events) { if (!run.active) break; run.onEvent(event, decoded.roomId); }
-        if (decoded.errors) run.onState({ error: '已忽略无法解析的视频号互动；其余消息继续接收。' });
+        for (const event of decoded.events) {
+          if (!run.active) break;
+          if (event.event_type === 'room_stats' && !currentSnapshot) continue;
+          this.notify(run, 'onEvent', event, decoded.roomId);
+        }
+        if (decoded.errors) this.notifyRequestState(run, request, { error: '已忽略无法解析的视频号互动；其余消息继续接收。' });
       } catch {
-        if (run.active) run.onState({ state: 'message-error', error: '视频号响应暂时无法解析，等待下一次消息；若持续异常，需要更新接入组件。' });
+        if (run.active) this.notifyRequestState(run, request, { state: 'message-error', error: '视频号响应暂时无法解析，等待下一次消息；若持续异常，需要更新接入组件。' });
       } finally { run.inFlight--; }
     }
   }
@@ -275,11 +304,11 @@ class WechatCollector {
       try {
         const cookies = (await run.session.cookies.get({})).filter(validCookie).slice(0, 100).map(cookieDetails);
         if (!run.remember) return;
-        if (!cookies.length) { this.credentials.clear('wechat'); if (run.active) run.onState({ loginSaved: false }); return; }
+        if (!cookies.length) { this.credentials.clear('wechat'); if (run.active) this.notify(run, 'onState', { loginSaved: false }); return; }
         this.credentials.save('wechat', JSON.stringify(cookies));
-        if (run.active) run.onState({ loginSaved: true });
+        if (run.active) this.notify(run, 'onState', { loginSaved: true });
       } catch {
-        if (run.active) run.onState({ error: '视频号登录记录未能加密保存，本次仍可接收，下次需重新扫码。' });
+        if (run.active) this.notify(run, 'onState', { error: '视频号登录记录未能加密保存，本次仍可接收，下次需重新扫码。' });
       }
     });
     return run.saving;

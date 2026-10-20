@@ -1,0 +1,21 @@
+name: 能力建议或社区案例
+description: 提交具体使用场景、协议线索或公开接入案例。
+title: "[Proposal] "
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: 希望解决的问题或展示的项目
+      description: 描述使用场景、平台及预期字段。社区案例请附项目公开链接和 LiveConnect 版本。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 已知来源与验证情况
+      description: 可提供官方资料、开源源码链接或合成样本；区分代码线索与已验证行为。不要提交凭据或真实观众记录。
+  - type: textarea
+    id: success
+    attributes:
+      label: 怎样算完成
+      description: 例如哪些事件、哪些字段和哪些异常情况需要被正确处理。

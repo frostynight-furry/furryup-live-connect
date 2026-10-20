@@ -1,14 +1,51 @@
 # FurryUP LiveConnect
 
+[![CI](https://github.com/frostynight-furry/furryup-live-connect/actions/workflows/test.yml/badge.svg)](https://github.com/frostynight-furry/furryup-live-connect/actions/workflows/test.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.12-43853d.svg)](package.json)
+
 **为开发者提供 B站、抖音、快手、视频号四平台直播互动采集能力。** 用统一事件构建自己的弹幕工具、互动桌宠、OBS 组件和定制直播工具箱。
 
 Open-source livestream event adapters for Bilibili, Douyin, Kuaishou and WeChat Channels, with a shared Node.js event API. MIT licensed.
 
 [FurryUP 官网](https://frostynight.top/furryup) · [FurryUP Studio 下载](https://github.com/frostynight-furry/furryup-studio-releases) · [FurryUP 桌宠](https://github.com/frostynight-furry/furryup-desktop-pet-releases) · [参与贡献](CONTRIBUTING.md)
 
-版本 `0.1.0`。包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+[English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
+
+版本 `0.1.1`。包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
 
 本目录通过 Maven 使用 OrdinaryRoad 已发布的三个模块，**没有复制完整 OrdinaryRoad 项目，也不是它的官方维护仓库**。FurryUP Studio 主程序、插件管理器、账户服务、直播助手、弹幕气泡和礼物特效不在拆分范围内。
+
+## 先跑一个离线示例
+
+安装 Node.js 22.12+ 后执行以下命令。这个示例不需要 Java、Electron、账号或直播间，也不连接平台：
+
+```sh
+git clone https://github.com/frostynight-furry/furryup-live-connect.git
+cd furryup-live-connect
+npm run demo
+```
+
+你会看到四个平台的**合成弹幕和礼物**进入同一个订阅接口，以及重复消息过滤、礼物增量累计的结果。输出明确标记为演示数据。它用于理解接入方式，不能证明某个真实房间当前可连接。
+
+| 接下来要做什么 | 入口 |
+| --- | --- |
+| 将事件接入自己的工具 | [API 文档](docs/API.md)，`require('./core/index.cjs')` |
+| 连接 B站 / 抖音 / 快手 | 下方“三平台 Java 采集”，或 `npm run start:multi` |
+| 连接自己的视频号后台 | 下方“视频号 Electron 示例” |
+| 排查环境、登录、断线和头像 | [排错指南](docs/TROUBLESHOOTING.md) |
+| 直接使用完整主播端产品 | [FurryUP Studio](https://github.com/frostynight-furry/furryup-studio-releases) |
+
+```mermaid
+flowchart LR
+  B[哔哩哔哩] --> J[Java 采集器]
+  D[抖音] --> J
+  K[快手] --> J
+  W[视频号授权后台] --> E[Electron 采集器]
+  J --> C[统一事件与订阅]
+  E --> C
+  C --> T[你的弹幕工具 / 桌宠 / OBS 组件]
+```
 
 ## 接入范围
 
@@ -36,10 +73,12 @@ Open-source livestream event adapters for Bilibili, Douyin, Kuaishou and WeChat 
 | 进房 / 关注 | 已适配 | 已适配 | 尚缺可靠事件 | 已适配 |
 | 分享 | 已适配 | 已适配 | 已适配分享列表 | 通知不等同于明确分享 |
 | 房间统计 | 区分当前在线、累计观看、点赞 | 按已知字段输出 | 仅解析精确整数，排除“万”等缩写 | 后台在线 / 点赞 / 直播状态 |
-| 观众列表 | 不提供完整名单 | 部分贡献榜 / 座位快照 | 部分可见观众快照 | 尚缺 |
+| 观众列表 | 不提供完整名单 | 部分贡献榜快照 | 部分可见观众快照 | 尚缺 |
 | PK | 尚未适配 | 部分状态，非完整比分 | 部分状态，非完整比分 | 尚缺 |
 
 所有平台均不保证完整在线观众名单、全量历史补拉或断线期间消息恢复。完整 PK、视频号礼物图片和快手进房 / 关注是欢迎贡献的方向。
+
+具体参考项目、待验证项和验收要求见[路线图](docs/ROADMAP.md)。本表是当前实现范围，路线图中的项目尚未完成。
 
 ## 环境与验证
 
@@ -83,6 +122,16 @@ stdout 为 UTF-8 NDJSON，每行一个对象，`kind` 为 `status`、`diagnostic
 
 Java 程序禁用了 SDK 自动重连。`examples/java-stdin.cjs` 展示原始进程接口；需要统一订阅和重连时运行 `npm run start:java:subscribe`，同样在 stdin 第一行提供配置并保持输入打开。它使用 `createJavaCollector`，默认对可重试故障等待 3 秒、6 秒，最多重试两次；登录、验证码、限流、离线和已识别的协议错误交由调用方处理，不持续尝试。连接等待上限为 45 秒。`--self-test` 只检查组件加载和内部断言；`--network-self-test` 只检查本地网络选择器，均不等于真实平台连接验证。
 
+### 多平台并行
+
+构建后执行 `npm run start:multi`，在 stdin 第一行输入配置并保持打开：
+
+```json
+{"connections":[{"platform":"bilibili","roomId":"YOUR_BILIBILI_ROOM","cookie":""},{"platform":"douyin","roomId":"YOUR_DOUYIN_ROOM","cookie":""},{"platform":"kuaishou","roomId":"YOUR_KUAISHOU_ROOM","cookie":""}]}
+```
+
+示例先校验整份配置，再为每个房间启动独立采集器，共用一个事件订阅接口。它只输出平台、房间、类型、数量及受限状态，不输出 Cookie 或弹幕正文；登录凭据应由宿主通过管道传入。EOF / Ctrl+C 会停止所有子进程。视频号需要 Electron 主进程，接法见 [API 文档](docs/API.md)，不能将 `wechat` 填入这个纯 Node 示例冒充连接。
+
 ## 视频号 Electron 示例
 
 ```sh
@@ -111,7 +160,7 @@ await collector.connect({
 // 完成后：await collector.stop();
 ```
 
-`BrowserWindow`、`session` 来自 Electron 主进程。若启用 `remember: true`，调用方须提供同步的 `has/read/save/clear` 凭据存储，妥善加密与管理登录记录；本仓库不提供持久化实现。仅 Cookie 无法保证恢复完整视频号账号选择状态；同进程内 `stop({ preserveSession: true })` 可以保留完整临时会话，`stop()` 会清理。
+`BrowserWindow`、`session` 来自 Electron 主进程。若启用 `remember: true`，调用方须提供同步的 `has/read/save/clear` 凭据存储，妥善加密与管理登录记录；本仓库不提供持久化实现。仅 Cookie 无法保证恢复完整视频号账号选择状态。只有该连接启用 `remember: true` 时，`stop({ preserveSession: true })` 才会保留完整临时会话供同进程复用；`stop()` 会清理。
 
 ## 统一事件订阅
 
@@ -136,7 +185,9 @@ const unsubscribeAvatars = live.subscribeAvatars(update => {
 
 可选在快手 `openRoom` 时传入 `kuaishouCookie`，启用同房间可靠用户 ID 的资料查询。默认不读取本机凭据，不查询隐藏身份，不依据昵称匹配。查询限速、超时、负缓存和风控冷却均有上限；关闭房间会取消待处理查询。
 
-`live.history(filters)` 返回有界内存历史；事件以 `platform`、`room_id`、`event_type`、`event_id`、`source_msg_id` 和对应业务字段表达。没有可靠消息 ID 的独立互动不按文本去重。头像可通过 `live.getAvatar(avatar_id)` 获取受限 CDN 下载的结果；不会把登录 Cookie 传给图片服务器。
+`live.history(filters)` 返回整个 hub 共用的最多 100 条内存历史，不包含房间统计、观众列表和 PK 快照。事件以 `platform`、`room_id`、`event_type`、`event_id`、`source_msg_id` 和对应业务字段表达；没有可靠消息 ID 的独立互动不按文本去重。`await live.getAvatar(avatar_id)` 返回已登记头像的 `{ type, body: Buffer }` 或 `null`，下载仅限平台 CDN，不携带登录 Cookie。
+
+结束时先 `await runner.stop()` / `await collector.stop()`，再 `live.close()`。关闭 hub 或 room 只清理事件、头像和房间会话，不会替你停止外部采集器。完整参数、事件语义、回调错误处理及多平台关闭顺序见 [API 文档](docs/API.md)。
 
 `node examples/subscribe.cjs <platform> <roomId>` 从 stdin 接收采集器的 NDJSON，只输出路由、类型和数量，展示如何将采集与业务订阅分开。调用方须保持上游采集进程的 stdin 打开。
 
@@ -159,3 +210,9 @@ const unsubscribeAvatars = live.subscribeAvatars(update => {
 此仓库仅发布独立源码，没有 JRE、依赖 JAR、账户信息、实际直播记录和原产品私有历史。`package.json` 的 `private: true` 只防止误发布到 npm，不改变 GitHub 源码的 MIT 许可。
 
 **想自己开发：** 使用 LiveConnect 接入你的工具箱，欢迎反馈和贡献协议修复。**想直接开播使用：** [FurryUP Studio](https://github.com/frostynight-furry/furryup-studio-releases) 提供完整主播端产品，[FurryUP 桌宠](https://github.com/frostynight-furry/furryup-desktop-pet-releases) 提供桌面陪伴体验。开源底层能力与 FurryUP 产品持续共同迭代。
+
+下面展示 FurryUP Studio 官方下载仓库已公开的工作台界面，使用示例消息；它展示完整产品的应用方式，不是 LiveConnect 附带的界面。图片和品牌不纳入本仓库源码的 MIT 许可。
+
+[![FurryUP Studio 四平台工作台，使用示例消息](https://raw.githubusercontent.com/frostynight-furry/furryup-studio-releases/main/assets/screenshots/live-workbench.png)](https://github.com/frostynight-furry/furryup-studio-releases#界面预览)
+
+做出了自己的工具？欢迎按[案例提交说明](docs/SHOWCASE.md)提供公开项目链接。我们会区分官方产品和独立社区项目，不将未接入的项目标记为用户案例。

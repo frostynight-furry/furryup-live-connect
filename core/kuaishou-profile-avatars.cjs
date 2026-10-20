@@ -98,7 +98,7 @@ function createKuaishouProfileAvatars({ roomId, cookie = '', onAvatar = () => {}
     if (delay > 0) { timer = setTimeout(drain, delay); timer.unref?.(); return; }
     const request = waiting.shift();
     if (entries.get(request.userId) !== request.entry) { drain(); return; }
-    pending = request; nextAt = now() + spacingMs;
+    pending = request;
     request.controller = new AbortController();
     void run(request);
   }
@@ -106,7 +106,13 @@ function createKuaishouProfileAvatars({ roomId, cookie = '', onAvatar = () => {}
     let deadline;
     const timeout = new Promise(resolve => { deadline = setTimeout(() => { request.controller.abort(); resolve({}); }, timeoutMs); deadline.unref?.(); });
     let info = {};
-    try { info = await Promise.race([fetchKuaishouProfileAvatar(request.userId, { roomId, cookie, signal: request.controller.signal, fetchImpl }), timeout]); }
+    try {
+      const lookup = fetchKuaishouProfileAvatar(request.userId, { roomId, cookie, signal: request.controller.signal, fetchImpl });
+      // The async helper has called fetchImpl before yielding. Anchor spacing
+      // after that call so URL/transport setup or preemption cannot consume it.
+      nextAt = now() + spacingMs;
+      info = await Promise.race([lookup, timeout]);
+    }
     catch { /* Missing profile data must not delay or interrupt live messages. */ }
     finally { clearTimeout(deadline); }
     if (!stopped && pending === request) {

@@ -1,7 +1,6 @@
 // Copyright (c) 2026 FrostyNight. See LICENSE.
 'use strict';
-const { EventEmitter } = require('node:events');
-const { PLATFORMS, EVENT_TYPES, LiveEventStream, normalizeEvent, validateRoute } = require('./event-stream.cjs');
+const { PLATFORMS, EVENT_TYPES, LiveEventStream, normalizeEvent, validateRoute, ObserverSafeEmitter } = require('./event-stream.cjs');
 const { avatarInfo, createAvatarCache } = require('./avatar-cache.cjs');
 const { createKuaishouProfileAvatars, fetchKuaishouProfileAvatar } = require('./kuaishou-profile-avatars.cjs');
 const { createJavaCollector } = require('./java-collector.cjs');
@@ -21,7 +20,7 @@ function matcher({ platform, roomId, eventTypes } = {}) {
 }
 
 /** An in-memory event hub. Collectors remain explicit; opening a room does not log in or connect. */
-class LiveConnect extends EventEmitter {
+class LiveConnect extends ObserverSafeEmitter {
   constructor({ maxRooms = 16, avatarCacheOptions, profileOptions } = {}) {
     super();
     if (!Number.isSafeInteger(maxRooms) || maxRooms < 1 || maxRooms > 64) throw new TypeError('Invalid room limit');
@@ -39,6 +38,7 @@ class LiveConnect extends EventEmitter {
       this.images.register(event);
       this.emit('viewer-avatar', event);
     });
+    this.stream.on('observer-error', error => this.emit('observer-error', error));
   }
 
   openRoom({ platform, roomId, kuaishouCookie = '' } = {}) {
@@ -94,7 +94,7 @@ class LiveConnect extends EventEmitter {
   subscribeAvatars(callback, filters) { return this.subscribeTo('viewer-avatar', callback, filters); }
   subscribeTo(channel, callback, filters) {
     if (this.closed || typeof callback !== 'function') throw new TypeError('Invalid subscription');
-    const matches = matcher(filters), listener = event => { if (matches(event)) callback(event); };
+    const matches = matcher(filters), listener = event => { if (matches(event)) return callback(event); };
     this.on(channel, listener);
     return () => this.off(channel, listener);
   }

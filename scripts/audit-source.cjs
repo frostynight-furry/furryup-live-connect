@@ -5,11 +5,14 @@ const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
   '.gitignore', '.gitattributes', '.github/workflows/test.yml', 'LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md',
-  'CONTRIBUTING.md', 'SECURITY.md',
+  'CONTRIBUTING.md', 'SECURITY.md', 'README.en.md', 'CHANGELOG.md',
+  'docs/API.md', 'docs/TROUBLESHOOTING.md', 'docs/ROADMAP.md', 'docs/SHOWCASE.md',
+  '.github/ISSUE_TEMPLATE/bug_report.yml', '.github/ISSUE_TEMPLATE/feature_request.yml', '.github/ISSUE_TEMPLATE/config.yml', '.github/PULL_REQUEST_TEMPLATE.md',
   'package.json', 'package-lock.json', 'collector/pom.xml', 'collector/src/main/resources/logback.xml',
   'licenses/ORDINARYROAD-LICENSE.txt', 'licenses/BLIVEDM-LICENSE.txt', 'licenses/WXLIVESPY-LICENSE.txt',
   'wechat/wechat-collector.cjs', 'wechat/wechat-decoder.cjs', 'test/wechat.test.cjs',
   'examples/java-stdin.cjs', 'examples/wechat-electron.cjs', 'examples/subscribe.cjs', 'examples/java-subscribe.cjs',
+  'examples/offline-demo.cjs', 'examples/multi-platform.cjs', 'test/examples.test.cjs',
   'core/index.cjs', 'core/event-stream.cjs', 'core/avatar-cache.cjs', 'core/kuaishou-profile-avatars.cjs', 'core/emotes.cjs', 'core/java-collector.cjs',
   'test/core.test.cjs', 'test/core-avatar-cache.test.cjs', 'test/core-kuaishou-profile-avatars.test.cjs', 'test/core-java-collector.test.cjs',
   'scripts/audit-source.cjs', 'scripts/build-java.cjs', 'scripts/java-runtime.cjs', 'scripts/test.cjs', 'scripts/test-java.cjs'

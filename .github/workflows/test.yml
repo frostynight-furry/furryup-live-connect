@@ -1,5 +1,8 @@
 name: Offline regression
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 jobs:
@@ -7,13 +10,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
+        node: ['22', '24']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,3 +26,5 @@ jobs:
           cache-dependency-path: collector/pom.xml
       - run: npm run build
       - run: npm test
+      - run: npm run demo
+      - run: node scripts/audit-source.cjs --tracked

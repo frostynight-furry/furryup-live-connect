@@ -316,7 +316,7 @@ test('内置后台使用隔离浏览器、限定响应来源，登录保留与�
   await f.collector.networkMessage(run, 'Network.responseReceived', { requestId: 'foreign', response: { url: 'https://evil.test', status: 200 } });
   await f.collector.networkMessage(run, 'Network.loadingFinished', { requestId: 'foreign' });
   assert.equal(f.commands.filter(item => item.name === 'Network.getResponseBody').length, 0);
-  await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId: 'own', request: { url, postData: JSON.stringify({ liveId: 'room', signature: 'secret' }) } });
+  await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId: 'own', request: { url, postData: JSON.stringify({ liveId: 'fixture-live-room', signature: 'secret' }) } });
   assert.equal(JSON.stringify([...run.requests]).includes('secret'), false);
   await f.collector.networkMessage(run, 'Network.responseReceived', { requestId: 'own', response: { url, status: 200 } });
   await f.collector.networkMessage(run, 'Network.loadingFinished', { requestId: 'own', encodedDataLength: 500 });
@@ -368,7 +368,7 @@ test('新版视频号互动地址与嵌套评论身份进入原消息链路，�
   const run = f.collector.run;
   for (const [index, endpoint] of [newUrl, url].entries()) {
     const requestId = `endpoint-${index}`;
-    await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId, request: { url: endpoint, postData: JSON.stringify({ liveId: 'actual-live' }) } });
+    await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId, request: { url: endpoint, postData: JSON.stringify({ liveId: 'fixture-live-room' }) } });
     await f.collector.networkMessage(run, 'Network.responseReceived', { requestId, response: { url: endpoint, status: 200 } });
     await f.collector.networkMessage(run, 'Network.loadingFinished', { requestId });
   }
@@ -423,7 +423,7 @@ test('损坏通知隔离于真实礼物，身份和通知文案有边界且未�
   assert.equal(decoded.events.filter(event => event.event_type === 'share').length, 0);
   const follow = decoded.events.find(event => event.event_type === 'follow');
   assert.equal(follow.user_id, ''); assert.equal(follow.avatar_url, '');
-  assert.equal(follow.user_name.length, 64); assert.equal(follow.source_msg_id.length, 128); assert.equal(follow.content.length, 1000);
+  assert.equal(follow.user_name.length, 64); assert.equal(follow.source_msg_id, ''); assert.equal(follow.content.length, 1000);
 });
 
 test('迟到的旧视频号状态不能覆盖新的下播状态，旧响应内真实互动仍继续接收', async () => {
@@ -469,4 +469,100 @@ test('后台网络失败保留可刷新的窗口，忽略子资源失败且重�
   assert.equal(f.events.length, 5);
   assert.equal(f.states.findLast(item => item.state)?.state, 'connected');
   await f.collector.stop();
+});
+
+test('业务回调失败只报告脱敏observer错误，后续互动和其他诊断观察者继续接收', async () => {
+  const f = browserFixture(), delivered = [], diagnostics = [], observerErrors = [];
+  const fail = () => { throw new Error('PRIVATE_ACCOUNT_COOKIE'); };
+  f.collector.on('observer-error', fail);
+  f.collector.on('observer-error', async () => { throw new Error('PRIVATE_DIAGNOSTIC'); });
+  f.collector.on('observer-error', value => observerErrors.push(value));
+  await f.collector.connect({
+    remember: false,
+    onState: fail,
+    onEvent: event => {
+      delivered.push(event.event_type);
+      if (event.event_type === 'comment') fail();
+      if (event.event_type === 'enter') return Promise.reject(new Error('PRIVATE_ASYNC_ACCOUNT'));
+    },
+    onDiagnostic: metric => {
+      diagnostics.push(metric);
+      if (metric === 'giftCallbacks') fail();
+    }
+  });
+  const run = f.collector.run;
+  await f.collector.networkMessage(run, 'Network.responseReceived', { requestId: 'batch', response: { url, status: 200 } });
+  await f.collector.networkMessage(run, 'Network.loadingFinished', { requestId: 'batch' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(delivered, ['comment', 'enter', 'gift', 'like', 'room_stats']);
+  assert.ok(diagnostics.includes('observerErrors'));
+  assert.ok(observerErrors.some(value => value.channel === 'onEvent'));
+  assert.ok(observerErrors.some(value => value.channel === 'onDiagnostic'));
+  assert.ok(observerErrors.every(value => value.code === 'OBSERVER_CALLBACK_FAILED' &&
+    Object.keys(value).sort().join() === 'channel,code'));
+  assert.doesNotMatch(JSON.stringify(observerErrors), /PRIVATE/);
+  await f.collector.stop();
+});
+
+test('切房后的旧请求不覆盖新房连接与统计，旧真实互动保留原路由', async () => {
+  const older = deferred();
+  const response = (liveId, onlineCnt, messageId) => ({ errCode: 0, data: {
+    liveInfo: { liveId, onlineCnt, liveStatus: 1 },
+    msgList: [{ type: 1, clientMsgId: messageId, content: 'synthetic' }]
+  } });
+  const f = browserFixture({ messageResponse: ({ requestId }) =>
+    requestId === 'older' ? older.promise : response('new-room', 20, 'new-comment') });
+  await f.connect(); const run = f.collector.run;
+  await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId: 'old-failure',
+    request: { url, postData: JSON.stringify({ liveId: 'old-room' }) } });
+  for (const [requestId, liveId] of [['older', 'old-room'], ['newer', 'new-room']]) {
+    await f.collector.networkMessage(run, 'Network.requestWillBeSent', { requestId, request: { url, postData: JSON.stringify({ liveId }) } });
+    await f.collector.networkMessage(run, 'Network.responseReceived', { requestId, response: { url, status: 200 } });
+  }
+  const pending = f.collector.networkMessage(run, 'Network.loadingFinished', { requestId: 'older' });
+  await f.collector.networkMessage(run, 'Network.loadingFinished', { requestId: 'newer' });
+  await f.collector.networkMessage(run, 'Network.loadingFailed', { requestId: 'old-failure' });
+  older.resolve(response('old-room', 10, 'old-comment')); await pending;
+  assert.deepEqual(f.states.filter(state => state.state === 'connected').map(state => state.roomId), ['new-room']);
+  assert.equal(f.states.some(state => state.state === 'message-error'), false);
+  assert.deepEqual(f.events.filter(item => item.event.event_type === 'room_stats').map(item => item.roomId), ['new-room']);
+  assert.deepEqual(f.events.filter(item => item.event.event_type === 'comment').map(item => item.roomId), ['new-room', 'old-room']);
+  await f.collector.stop();
+});
+
+test('在connected回调同步停止后不再发送状态或同批互动', async () => {
+  const value = sample(); value.data.liveInfo.liveStatus = 1;
+  const f = browserFixture({ messageResponse: () => value });
+  const events = []; let stopping;
+  await f.collector.connect({ remember: false,
+    onState: state => { if (state.state === 'connected') stopping = f.collector.stop(); },
+    onEvent: event => events.push(event)
+  });
+  const run = f.collector.run;
+  await f.collector.networkMessage(run, 'Network.responseReceived', { requestId: 'batch', response: { url, status: 200 } });
+  await f.collector.networkMessage(run, 'Network.loadingFinished', { requestId: 'batch' });
+  await stopping;
+  assert.deepEqual(events, []);
+  assert.equal(run.active, false);
+});
+
+test('视频号不截断消息与用户身份，无效或冲突房间不回退到其他路由', () => {
+  const { createLiveConnect } = require('../core/index.cjs');
+  const prefix = 'x'.repeat(128);
+  const response = { errCode: 0, data: { liveInfo: { liveId: 'room' }, msgList: [
+    { type: 1, clientMsgId: prefix + 'a', username: prefix + 'a', content: 'first' },
+    { type: 1, clientMsgId: prefix + 'b', username: prefix + 'b', content: 'second' }
+  ] } };
+  const decoded = decodeWechatResponse(JSON.stringify(response));
+  assert.ok(decoded.events.every(event => event.source_msg_id === '' && event.user_id === ''));
+  const hub = createLiveConnect(), room = hub.openRoom({ platform: 'wechat', roomId: decoded.roomId });
+  for (const event of decoded.events) room.ingest(event);
+  assert.equal(room.history().length, 2);
+  hub.close();
+  for (const liveId of [prefix + 'a', 'bad\nroom', 'other-room', null]) {
+    const value = { ...response, data: { ...response.data, liveInfo: { liveId } } };
+    assert.equal(decodeWechatResponse(JSON.stringify(value), { liveId: 'room' }).roomId, '');
+  }
+  assert.equal(decodeWechatResponse(JSON.stringify(response), { liveId: prefix + 'a' }).roomId, '');
+  assert.equal(decodeWechatResponse(JSON.stringify({ errCode: 0, data: { msgList: [] } }), { liveId: 'room' }).roomId, 'room');
 });

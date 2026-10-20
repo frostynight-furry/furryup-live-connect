@@ -19,8 +19,9 @@ function isMessageUrl(value) {
   } catch { return false; }
 }
 function identifier(value) {
-  if (typeof value === 'number' && !Number.isSafeInteger(value)) return '';
-  return typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 128) : '';
+  if (typeof value === 'number') return Number.isSafeInteger(value) && value >= 0 ? String(value) : '';
+  return typeof value === 'string' && value.length <= 128 && value === value.trim() &&
+    !/[\u0000-\u001f\u007f]/.test(value) ? value : '';
 }
 function counter(value) {
   if (typeof value === 'string' && /^\d{1,15}$/.test(value)) value = Number(value);
@@ -52,7 +53,14 @@ function decodeWechatResponse(body, request = {}) {
   const data = response.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid response');
   const info = data.liveInfo && typeof data.liveInfo === 'object' && !Array.isArray(data.liveInfo) ? data.liveInfo : {};
-  const roomId = identifier(info.liveId) || identifier(request.liveId);
+  // A present but invalid/mismatched room ID must not be replaced by another
+  // request's route. Only a genuinely omitted response ID may use its request.
+  const hasResponseRoom = Object.hasOwn(info, 'liveId');
+  const hasRequestRoom = Object.hasOwn(request, 'liveId') && request.liveId !== undefined;
+  const responseRoomId = identifier(info.liveId), requestRoomId = identifier(request.liveId);
+  const roomId = hasResponseRoom ? responseRoomId : requestRoomId;
+  if (hasRequestRoom && (!requestRoomId || hasResponseRoom && responseRoomId !== requestRoomId))
+    return { events: [], roomId: '', errors: 0 };
   if (!roomId || !/^[A-Za-z0-9_-]{1,128}$/.test(roomId)) return { events: [], roomId: '', errors: 0 };
   const events = [];
   let errors = 0, giftCallbacks = 0, giftParseErrors = 0;

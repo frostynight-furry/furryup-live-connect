@@ -124,6 +124,28 @@ test('queue bounds, single request concurrency and spacing protect live ingestio
   assert.equal(stream.accepted, 15);
 });
 
+test('request spacing starts after synchronous transport preparation, even when it consumes the original interval', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 });
+  const stream = new LiveEventStream(), starts = [];
+  const resolver = createKuaishouProfileAvatars({ roomId: 'room', cookie: 'fixture', spacingMs: 25,
+    fetchImpl: async url => {
+      // Deterministically model initial URL/transport setup or preemption before
+      // the first observable request start, without relying on wall-clock load.
+      if (!starts.length) t.mock.timers.tick(100);
+      starts.push(Date.now());
+      return profile(new URL(url).searchParams.get('principalId'));
+    } });
+  t.after(() => resolver.dispose());
+  for (let i = 0; i < 3; i++) resolver.resolve(event(stream, `delayed-viewer-${i}`));
+  const flush = () => new Promise(resolve => setImmediate(resolve));
+  await flush();
+  assert.deepEqual(starts, [1100], 'A slow first transport start must not consume the interval before the next request');
+  t.mock.timers.tick(24); await flush(); assert.equal(starts.length, 1);
+  t.mock.timers.tick(1); await flush(); assert.deepEqual(starts, [1100, 1125]);
+  t.mock.timers.tick(24); await flush(); assert.equal(starts.length, 2);
+  t.mock.timers.tick(1); await flush(); assert.deepEqual(starts, [1100, 1125, 1150]);
+});
+
 test('negative cache and platform challenge cooldown prevent retries from subsequent comments', async t => {
   let clock = 1000, calls = 0;
   const stream = new LiveEventStream();

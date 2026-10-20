@@ -1,0 +1,52 @@
+name: 连接或事件问题
+description: 报告可复现的问题，请使用脱敏或合成数据。
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "请勿提交 Cookie、令牌、二维码、完整后台响应或真实观众资料。安全漏洞请使用 Security → Report a vulnerability。"
+  - type: input
+    id: version
+    attributes:
+      label: LiveConnect 版本或提交
+      placeholder: "例如 0.1.1 或 Git commit"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台或模块
+      options:
+        - 哔哩哔哩
+        - 抖音
+        - 快手
+        - 视频号
+        - 统一事件 / 示例 / 构建
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 操作系统、Node.js、JDK/Maven 或 Electron 版本；无需本机路径。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤、预期和实际结果
+      description: 注明示例入口、有限状态码和是否可离线复现。不要粘贴凭据。
+    validations:
+      required: true
+  - type: textarea
+    id: fixture
+    attributes:
+      label: 合成输入或最小代码（可选）
+      description: 将账号、房间、观众替换为虚构值；不要提交原始直播记录。
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 发布前检查
+      options:
+        - label: 我确认内容不含凭据和真实用户隐私。
+          required: true
