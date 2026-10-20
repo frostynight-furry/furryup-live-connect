@@ -1,6 +1,6 @@
 {
   "name": "furryup-live-connect",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "FurryUP 四平台直播互动采集：B站、抖音、快手、视频号，统一事件与头像补全",
   "license": "MIT",

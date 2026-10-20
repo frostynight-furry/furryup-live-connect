@@ -7,10 +7,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { EventEmitter } = require('node:events');
+const vm = require('node:vm');
 
 const { decodeWechatResponse, isMessageUrl, LIVE_URL, MAX_BODY } = require('../wechat/wechat-decoder.cjs');
 
 const { WechatCollector } = require('../wechat/wechat-collector.cjs');
+const { WECHAT_LOGIN_ORIGIN, WECHAT_LOGIN_KEYS, MAX_WECHAT_LOGIN_BYTES, decodeWechatLogin,
+  encodeWechatLogin } = require('../wechat/wechat-login-state.cjs');
 
 const url = 'https://channels.weixin.qq.com/cgi-bin/mmfinderassistant-bin/live/msg';
 
@@ -66,7 +69,7 @@ test('单条损坏消息不影响其他互动；超大响应、未知事件与�
 });
 
 function browserFixture({ loadLive = null, messageResponse = sample, bodyResponse = null,
-  userAgent = 'Chrome/144.0 furryup-studio/0.6.0 Electron/43.1', onLoginDiagnostic = null } = {}) {
+  userAgent = 'Chrome/144.0 furryup-studio/0.6.0 Electron/43.1', onLoginDiagnostic = null, beforeCookieSet = null } = {}) {
   let stored = ''; const states = [], events = [], commands = [], windows = [], loginDiagnostics = [], sessions = [], credentialCalls = [];
   function createSession(partition) {
     const cookies = new EventEmitter(); cookies.items = [];
@@ -75,9 +78,19 @@ function browserFixture({ loadLive = null, messageResponse = sample, bodyRespons
       if (cookies.readGate) { cookies.readStarted = true; await cookies.readGate.promise; }
       return value;
     };
-    cookies.set = async cookie => { cookies.items.push({ ...cookie }); };
-    const session = { partition, cookies, localStorage: new Map(), clearCount: 0, on() {}, setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
+    cookies.set = async cookie => { if (beforeCookieSet) await beforeCookieSet(); cookies.items.push({ ...cookie }); };
+    const session = { partition, cookies, clearCount: 0, on() {}, setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
       async clearStorageData() { this.clearCount++; cookies.items = []; this.localStorage.clear(); } };
+    class StorageMap extends Map {
+      constructor(isLocalStorage) { super(); this.isLocalStorage = isLocalStorage; }
+      send(method, data = {}) { session.debugger?.emit('message', {}, `DOMStorage.${method}`,
+        { storageId: { securityOrigin: WECHAT_LOGIN_ORIGIN, isLocalStorage: this.isLocalStorage }, ...data }); }
+      set(key, value) { const existed = this.has(key); super.set(key, value);
+        this.send(existed ? 'domStorageItemUpdated' : 'domStorageItemAdded', { key, newValue: value }); return this; }
+      delete(key) { const result = super.delete(key); this.send('domStorageItemRemoved', { key }); return result; }
+      clear() { super.clear(); this.send('domStorageItemsCleared'); }
+    }
+    session.localStorage = new StorageMap(true); session.sessionStorage = new StorageMap(false);
     sessions.push(session); return session;
   }
   class FakeWindow extends EventEmitter {
@@ -89,11 +102,30 @@ function browserFixture({ loadLive = null, messageResponse = sample, bodyRespons
       wc.getUserAgent = () => userAgent; wc.setUserAgent = value => { this.ua = value; };
       wc.getURL = () => this.currentUrl || '';
       wc.debugger = new EventEmitter(); wc.debugger.attach = () => {};
+      options.webPreferences.session.debugger = wc.debugger; this.scripts = new Map();
       wc.debugger.sendCommand = async (name, params) => {
         commands.push({ name, params });
         if (name === 'Network.getResponseBody') return bodyResponse ? bodyResponse(params) : { body: JSON.stringify(await messageResponse(params)), base64Encoded: false };
+        if (name === 'Page.enable') { this.pageEnabled = true; return {}; }
+        if (name === 'Page.addScriptToEvaluateOnNewDocument') {
+          assert.equal(this.pageEnabled, true, 'the Page domain must be enabled before registering the first-document script');
+          this.scripts.set('restore-1', params.source); return { identifier: 'restore-1' };
+        }
+        if (name === 'Page.removeScriptToEvaluateOnNewDocument') { this.scripts.delete(params.identifier); return {}; }
+        if (name === 'Runtime.evaluate') {
+          if (this.destroyed) throw new Error('Target destroyed');
+          return { result: { value: JSON.parse(JSON.stringify(this.evaluate(params.expression))) } };
+        }
         return {};
       };
+    }
+    evaluate(source, { origin = new URL(this.currentUrl || 'about:blank').origin, top = true } = {}) {
+      const adapter = storage => ({ getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value),
+        removeItem: key => storage.delete(key), clear: () => storage.clear() });
+      const window = {}; window.top = top ? window : {};
+      return vm.runInNewContext(source, { location: { origin }, window,
+        localStorage: adapter(this.options.webPreferences.session.localStorage),
+        sessionStorage: adapter(this.options.webPreferences.session.sessionStorage) });
     }
     isDestroyed() { return this.destroyed; }
     isMinimized() { return this.minimized; }
@@ -102,7 +134,9 @@ function browserFixture({ loadLive = null, messageResponse = sample, bodyRespons
     close() { this.emit('close'); this.webContents.debugger.emit('detach', {}, 'target closed'); this.destroyed = true; this.emit('closed'); }
     async loadURL(value) {
       assert.ok([LIVE_URL, 'about:blank'].includes(value)); this.currentUrl = value;
+      for (const source of this.scripts.values()) this.evaluate(source);
       if (value === LIVE_URL && loadLive) await loadLive(this);
+      this.webContents.emit('dom-ready');
     }
     show() { this.shows++; this.focusActions.push('show'); }
     focus() { this.focuses++; this.focusActions.push('focus'); }
@@ -128,21 +162,197 @@ function setCompleteLogin(session) {
   session.localStorage.set('finder_raw', 'private-local-storage-key');
 }
 
-test('仅Cookie持久化不会冒充完整会话，完整停止后新分区没有旧localStorage', async () => {
+test('完整停止先保存白名单登录状态，新内存分区首个官方脚本即可恢复', async () => {
   const f = browserFixture(); await f.connect({ remember: true });
   const oldSession = f.collector.run.session; setCompleteLogin(oldSession);
   await f.collector.stop();
   assert.equal(oldSession.clearCount, 1); assert.equal(oldSession.localStorage.size, 0);
   assert.equal(f.collector.retainedSession, null);
-  assert.doesNotMatch(f.saved(), /finder_username|finder_raw|private-local-finder|private-local-storage-key/);
+  assert.equal(decodeWechatLogin(f.saved()).localStorage.finder_raw, 'private-local-storage-key');
   await f.connect({ remember: true });
   assert.notEqual(f.collector.run.session, oldSession);
   assert.notEqual(f.collector.run.session.partition, oldSession.partition);
-  assert.equal(f.collector.run.session.localStorage.size, 0);
+  assert.equal(f.collector.run.session.localStorage.get('finder_username'), 'private-local-finder');
+  assert.equal(f.collector.run.session.localStorage.get('finder_raw'), 'private-local-storage-key');
   assert.equal(f.collector.run.session.cookies.items[0].value, 'private-local-cookie');
   assert.equal(f.loginDiagnostics.at(-1).restored, true);
   assert.notEqual(f.loginDiagnostics.at(-1).reused, true);
   await f.collector.stop();
+});
+
+test('登录信封严格限制origin、键、UTF8体积和Cookie数量，旧数组保持24k边界', () => {
+  const cookie = { name: 'synthetic', value: 'fake', domain: '.weixin.qq.com', path: '/' };
+  const valid = { schemaVersion: 2, origin: WECHAT_LOGIN_ORIGIN, cookies: [cookie], localStorage: { finder_raw: '假'.repeat(100) } };
+  assert.equal(decodeWechatLogin(encodeWechatLogin(valid.cookies, valid.localStorage)).schemaVersion, 2);
+  assert.equal(decodeWechatLogin(JSON.stringify([cookie])).schemaVersion, 1);
+  const rejected = [
+    { ...valid, origin: 'https://channels.weixin.qq.com.evil.test' },
+    { ...valid, localStorage: { finder_raw: '假'.repeat(6000) } },
+    { ...valid, localStorage: { finder_raw: 'x', draft: 'private-draft' } },
+    { ...valid, sessionStorage: { finder_raw: 'not-supported' } },
+    { ...valid, cookies: Array(101).fill(cookie) },
+    { ...valid, cookies: [{ ...cookie, domain: '.evil.test' }] },
+    { ...valid, localStorage: { finder_username: 123 } }
+  ];
+  for (const value of rejected) assert.throws(() => decodeWechatLogin(JSON.stringify(value)), /Invalid saved WeChat login state/);
+  assert.throws(() => decodeWechatLogin(' '.repeat(MAX_WECHAT_LOGIN_BYTES + 1)));
+  assert.throws(() => decodeWechatLogin(JSON.stringify(Array(3).fill({ ...cookie, value: 'x'.repeat(9000) }))));
+  assert.throws(() => encodeWechatLogin(Array(10).fill({ ...cookie, value: 'x'.repeat(9000) })));
+});
+
+test('旧Cookie数组迁移为v2且丢弃过期项，损坏记录不会被失败连接覆盖', async () => {
+  const f = browserFixture();
+  f.credentials.save('wechat', JSON.stringify([
+    { name: 'alive', value: 'synthetic-alive', domain: '.weixin.qq.com', path: '/' },
+    { name: 'expired', value: 'synthetic-expired', domain: '.weixin.qq.com', path: '/', expirationDate: 1 }
+  ]));
+  await f.connect(); await f.collector.saveLogin(f.collector.run);
+  const saved = decodeWechatLogin(f.saved());
+  assert.equal(saved.schemaVersion, 2); assert.deepEqual(saved.cookies.map(cookie => cookie.name), ['alive']);
+  assert.deepEqual(saved.localStorage, {});
+  await f.collector.stop();
+  const broken = browserFixture(); broken.credentials.save('wechat', '{"private-corrupt-record":true}');
+  await broken.connect();
+  assert.equal(broken.saved(), '{"private-corrupt-record":true}');
+  assert.equal(broken.states.at(-1).errorCode, 'WECHAT_LOGIN_RECORD');
+  assert.doesNotMatch(JSON.stringify(broken.states), /private-corrupt/);
+});
+
+test('恢复脚本只作用于官方顶层首次文档，退出清空与后续导航不会回灌旧账户', async () => {
+  const firstRead = [];
+  const f = browserFixture({ loadLive: async window => firstRead.push(window.options.webPreferences.session.localStorage.get('finder_raw')) });
+  f.credentials.save('wechat', encodeWechatLogin([], { finder_username: 'synthetic-finder', finder_raw: 'synthetic-raw' }));
+  await f.connect();
+  assert.deepEqual(firstRead, ['synthetic-raw']);
+  const run = f.collector.run, source = f.commands.find(command => command.name === 'Page.addScriptToEvaluateOnNewDocument').params.source;
+  assert.equal(run.window.scripts.size, 0);
+  run.session.localStorage.clear();
+  run.session.sessionStorage.clear();
+  for (const context of [{ origin: 'https://weixin.qq.com' }, { origin: 'https://channels.weixin.qq.com.evil.test' }, { top: false }]) {
+    run.window.evaluate(source, context); assert.equal(run.session.localStorage.size, 0);
+  }
+  // The actual registered script has been removed, including after clearing
+  // sessionStorage during an official logout.
+  await run.window.loadURL(LIVE_URL);
+  assert.equal(run.session.localStorage.size, 0);
+  await f.collector.saveLogin(run); assert.equal(f.saved(), '');
+  await f.collector.stop(); assert.equal(f.saved(), '');
+});
+
+test('只保存四个认证键和精确origin事件，正常关窗用事件镜像保留最新清空值', async () => {
+  const f = browserFixture(); await f.connect();
+  const run = f.collector.run; setCompleteLogin(run.session);
+  run.session.localStorage.set('finder_uin', 'synthetic-uin');
+  run.session.localStorage.set('finder_login_token', 'synthetic-token');
+  run.session.localStorage.set('private-draft', 'not-saved');
+  f.collector.storageMessage(run, 'DOMStorage.domStorageItemUpdated', {
+    storageId: { securityOrigin: 'https://other.weixin.qq.com', isLocalStorage: true },
+    key: 'finder_raw', newValue: 'foreign-origin' });
+  await f.collector.saveLogin(run);
+  assert.deepEqual(Object.keys(decodeWechatLogin(f.saved()).localStorage).sort(), [...WECHAT_LOGIN_KEYS].sort());
+  assert.doesNotMatch(f.saved(), /private-draft|not-saved|foreign-origin/);
+  run.session.localStorage.delete('finder_raw');
+  run.session.localStorage.set('finder_login_token', '');
+  run.window.close(); await f.collector.stopping;
+  const saved = decodeWechatLogin(f.saved());
+  assert.equal(saved.localStorage.finder_raw, undefined);
+  assert.equal(saved.localStorage.finder_login_token, '');
+  assert.equal(saved.localStorage.finder_uin, 'synthetic-uin');
+  await f.collector.stop();
+});
+
+test('取消保留同步清除，迟到Cookie读取和旧停止任务无法重新写入', async () => {
+  const f = browserFixture(); await f.connect();
+  const run = f.collector.run; setCompleteLogin(run.session);
+  await f.collector.saveLogin(run);
+  const gate = deferred(); run.session.cookies.readGate = gate;
+  const stopping = f.collector.stop({ preserveSession: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(run.session.cookies.readStarted, true);
+  const clearing = f.collector.setRemember(false);
+  assert.equal(f.saved(), '');
+  gate.resolve(); await Promise.all([stopping, clearing]);
+  assert.equal(f.saved(), ''); assert.equal(f.collector.retainedSession, null);
+  assert.equal(run.window.isDestroyed(), true);
+});
+
+test('旧保存任务在关闭再开启保留之后仍过期，迟到清除不会抹掉新设置', async () => {
+  const f = browserFixture(); await f.connect();
+  const run = f.collector.run; setCompleteLogin(run.session);
+  const gate = deferred(); run.session.cookies.readGate = gate;
+  const oldSave = f.collector.saveLogin(run);
+  await new Promise(resolve => setImmediate(resolve));
+  const clearing = f.collector.setRemember(false);
+  run.session.cookies.items = [{ name: 'new-auth', value: 'synthetic-new-cookie', domain: '.weixin.qq.com', path: '/' }];
+  run.session.localStorage.set('finder_raw', 'synthetic-new-raw');
+  delete run.session.cookies.readGate;
+  const enabled = f.collector.setRemember(true);
+  gate.resolve(); await Promise.all([oldSave, clearing, enabled]);
+  assert.equal(decodeWechatLogin(f.saved()).cookies[0].value, 'synthetic-new-cookie');
+  assert.equal(decodeWechatLogin(f.saved()).localStorage.finder_raw, 'synthetic-new-raw');
+  assert.doesNotMatch(f.saved(), /private-local-cookie|private-local-storage-key/);
+  await f.collector.stop();
+});
+
+test('取消尚未完成的Cookie恢复后不注入旧storage，停止中的迟到恢复不成为可复用会话', async () => {
+  for (const action of ['forget', 'stop']) {
+    const gate = deferred(), started = deferred();
+    const f = browserFixture({ beforeCookieSet: () => { started.resolve(); return gate.promise; } });
+    f.credentials.save('wechat', encodeWechatLogin(
+      [{ name: 'old-auth', value: 'synthetic-old-cookie', domain: '.weixin.qq.com', path: '/' }],
+      { finder_username: 'synthetic-old-account', finder_raw: 'synthetic-old-raw' }));
+    const connecting = f.connect(); await started.promise;
+    const oldRun = f.collector.run;
+    if (action === 'forget') await f.collector.setRemember(false);
+    else await f.collector.stop({ preserveSession: true });
+    gate.resolve(); await connecting; await new Promise(resolve => setImmediate(resolve));
+    assert.equal(oldRun.session.cookies.items.length, 0);
+    assert.equal(oldRun.session.localStorage.size, 0);
+    assert.equal(f.commands.some(command => command.name === 'Page.addScriptToEvaluateOnNewDocument'), false);
+    if (action === 'forget') assert.equal(f.saved(), '');
+    else assert.equal(f.collector.retainedSession, null);
+    await f.collector.stop();
+  }
+});
+
+test('有界快照失败保持上次安全记录，异步快照不覆盖更新的storage事件', async () => {
+  const f = browserFixture(); await f.connect();
+  const run = f.collector.run; setCompleteLogin(run.session); await f.collector.saveLogin(run);
+  const previous = f.saved(), send = run.window.webContents.debugger.sendCommand;
+  run.window.webContents.debugger.sendCommand = async (method, params) => {
+    if (method === 'Runtime.evaluate') throw new Error('PRIVATE_RENDERER_SECRET');
+    return send(method, params);
+  };
+  await f.collector.saveLogin(run);
+  assert.equal(f.saved(), previous); assert.doesNotMatch(JSON.stringify(f.states), /PRIVATE_RENDERER_SECRET/);
+  const gate = deferred();
+  run.window.webContents.debugger.sendCommand = (method, params) => method === 'Runtime.evaluate' ? gate.promise : send(method, params);
+  const saving = f.collector.saveLogin(run); await new Promise(resolve => setImmediate(resolve));
+  run.session.localStorage.set('finder_raw', 'synthetic-current-raw');
+  gate.resolve({ result: { value: { finder_raw: 'synthetic-outdated-raw' } } }); await saving;
+  assert.equal(decodeWechatLogin(f.saved()).localStorage.finder_raw, 'synthetic-current-raw');
+  run.window.webContents.debugger.sendCommand = send;
+  await f.collector.stop();
+});
+
+test('保留会话重连时页面未加载不会用空镜像覆盖此前已保存的账号字段', async () => {
+  let navigation = 0;
+  const f = browserFixture({ loadLive: async window => {
+    if (++navigation > 1) {
+      window.currentUrl = 'about:blank';
+      throw Object.assign(new Error('Synthetic offline'), { code: 'ERR_INTERNET_DISCONNECTED' });
+    }
+  } });
+  await f.connect(); setCompleteLogin(f.session);
+  await f.collector.stop({ preserveSession: true });
+  assert.equal(f.collector.retainedLoginState.localStorage.finder_raw, 'private-local-storage-key');
+  await f.connect();
+  assert.equal(f.collector.run.reused, true);
+  assert.equal(f.states.at(-1).errorCode, 'WECHAT_PAGE_LOAD');
+  await f.collector.stop();
+  assert.equal(decodeWechatLogin(f.saved()).localStorage.finder_raw, 'private-local-storage-key');
+  assert.equal(decodeWechatLogin(f.saved()).localStorage.finder_username, 'private-local-finder');
+  assert.equal(f.collector.retainedLoginState, null);
 });
 
 test('不保留登录及清除已有保留会话都会清空完整浏览器数据', async () => {
@@ -603,7 +813,7 @@ test('被动目录接入补齐真实礼物增量图片，目录本身不产生�
   assert.equal(room.history().length, 1);
   assert.equal(room.history()[0].gift_image_url, giftEvent.gift_image_url);
   hub.close();
-  assert.ok(f.commands.every(command => ['Network.enable', 'Network.getResponseBody'].includes(command.name)),
+  assert.ok(f.commands.every(command => ['Network.enable', 'DOMStorage.enable', 'Network.getResponseBody'].includes(command.name)),
     'collector never initiates an API request');
   await f.collector.stop();
   assert.equal(run.giftCatalog.rooms.size, 0);

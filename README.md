@@ -12,7 +12,7 @@ Open-source livestream event adapters for Bilibili, Douyin, Kuaishou and WeChat 
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-版本 `0.2.0`。包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+版本 `0.2.1`。包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
 
 本目录通过 Maven 使用 OrdinaryRoad 已发布的三个模块，**没有复制完整 OrdinaryRoad 项目，也不是它的官方维护仓库**。FurryUP Studio 主程序、插件管理器、账户服务、直播助手、弹幕气泡和礼物特效不在拆分范围内。
 
@@ -160,7 +160,7 @@ await collector.connect({
 // 完成后：await collector.stop();
 ```
 
-`BrowserWindow`、`session` 来自 Electron 主进程。若启用 `remember: true`，调用方须提供同步的 `has/read/save/clear` 凭据存储，妥善加密与管理登录记录；本仓库不提供持久化实现。仅 Cookie 无法保证恢复完整视频号账号选择状态。只有该连接启用 `remember: true` 时，`stop({ preserveSession: true })` 才会保留完整临时会话供同进程复用；`stop()` 会清理。
+`BrowserWindow`、`session` 来自 Electron 主进程。若启用 `remember: true`，调用方须提供同步的 `has/read/save/clear` 加密凭据存储；本仓库不提供落盘实现。自 `0.2.1` 起，保存记录包含 Cookie 与官方后台账号选择所需的四个 localStorage 字段，格式及 128 KiB 上限见 [API 文档](docs/API.md#视频号适配)。旧 Cookie 数组仍可读取。恢复仅作用于指定官方来源，不保存浏览器草稿、任意网页存储或完整浏览器目录；登录过期、主动退出或平台验证仍需重新登录。`stop({ preserveSession: true })` 可在启用记忆时保留完整临时会话供同进程复用；`await stop()` 会先保存必要状态再清理临时浏览器数据。
 
 ## 统一事件订阅
 

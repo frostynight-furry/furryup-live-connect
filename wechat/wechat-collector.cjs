@@ -4,6 +4,8 @@ const { ObserverSafeEmitter } = require('../core/event-stream.cjs');
 const { decodeWechatResponse, isMessageUrl, LIVE_URL, MAX_BODY } = require('./wechat-decoder.cjs');
 const { isGiftCatalogUrl, metadataRoomId, WechatGiftCatalog } = require('./wechat-gifts.cjs');
 const { isViewerListUrl, decodeWechatViewersResponse } = require('./wechat-viewers.cjs');
+const { WECHAT_LOGIN_ORIGIN, WECHAT_LOGIN_KEYS, MAX_STORAGE_VALUE_BYTES,
+  decodeWechatLogin, encodeWechatLogin, normalizeStorage, validCookie, cookieDetails } = require('./wechat-login-state.cjs');
 const MAX_LOGIN_BODY = 256 * 1024;
 const AUTH_STAGES = new Map([
   ['/cgi-bin/mmfinderassistant-bin/auth/auth_with_oauth', 'oauth'],
@@ -45,18 +47,11 @@ function allowedPage(value) {
   try { const url = new URL(value); return url.protocol === 'https:' && !url.port && !url.username && !url.password &&
     (url.hostname === 'weixin.qq.com' || url.hostname.endsWith('.weixin.qq.com')); } catch { return false; }
 }
-function validCookie(cookie) {
-  return cookie && typeof cookie.name === 'string' && cookie.name.length <= 256 &&
-    typeof cookie.value === 'string' && cookie.value.length <= 12000 &&
-    typeof cookie.domain === 'string' && (cookie.domain.replace(/^\./, '') === 'weixin.qq.com' || cookie.domain.endsWith('.weixin.qq.com')) &&
-    typeof cookie.path === 'string' && cookie.path.startsWith('/') && cookie.path.length <= 1024;
-}
-function cookieDetails(cookie) {
-  const details = { url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`, name: cookie.name, value: cookie.value,
-    domain: cookie.domain, path: cookie.path, secure: true, httpOnly: cookie.httpOnly === true };
-  if (['unspecified', 'no_restriction', 'lax', 'strict'].includes(cookie.sameSite)) details.sameSite = cookie.sameSite;
-  if (Number.isFinite(cookie.expirationDate)) details.expirationDate = cookie.expirationDate;
-  return details;
+function bounded(promise) {
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Login state operation timed out')), 3000);
+  })]).finally(() => clearTimeout(timer));
 }
 const PAGE_LOAD_ERROR = '视频号后台暂时无法打开，请检查网络并在后台窗口刷新，或断开后重新连接。';
 // The remote page never receives a preload or Node privileges. Persistence is
@@ -67,6 +62,7 @@ class WechatCollector extends ObserverSafeEmitter {
     this.BrowserWindow = BrowserWindow; this.sessionApi = session; this.credentials = credentials;
     this.onLoginDiagnostic = onLoginDiagnostic;
     this.showWindows = showWindows; this.run = null; this.stopping = null; this.retainedSession = null; this.connectGeneration = 0;
+    this.loginGeneration = 0; this.stoppingRun = null; this.retainedLoginState = null;
   }
   notify(run, channel, ...args) {
     if (!run.active || typeof run[channel] !== 'function') return;
@@ -91,10 +87,14 @@ class WechatCollector extends ObserverSafeEmitter {
     const generation = ++this.connectGeneration;
     await this.stop({ preserveSession: true, keepConnecting: true });
     if (generation !== this.connectGeneration) return;
-    const retainedSession = this.retainedSession; this.retainedSession = null;
+    const retainedSession = this.retainedSession, retainedLoginState = this.retainedLoginState;
+    this.retainedSession = null; this.retainedLoginState = null;
     if (retainedSession && !remember) await retainedSession.clearStorageData().catch(() => {});
     if (generation !== this.connectGeneration) return;
     const run = { active: true, closing: false, remember, restored: false, reused: Boolean(remember && retainedSession), loginSessionReported: false, onState, onEvent, onDiagnostic,
+      loginGeneration: this.loginGeneration, restoreGeneration: this.loginGeneration, canSaveLogin: false,
+      localStorage: remember && retainedSession ? { ...retainedLoginState?.localStorage } : {},
+      storageRevision: 0, invalidStorageKeys: new Set(remember && retainedSession ? retainedLoginState?.invalidStorageKeys : []), storageClosed: false,
       requests: new Map(), authRequests: new Map(), authInFlight: 0, savedTimer: null, saving: Promise.resolve(), inFlight: 0,
       metadataRequests: new Map(), metadataInFlight: 0, metadataOrder: 0, latestViewerOrder: 0,
       giftCatalog: new WechatGiftCatalog(), messageRoomId: '',
@@ -110,18 +110,26 @@ class WechatCollector extends ObserverSafeEmitter {
     let stage = 'login-record';
     try {
       if (remember && !run.reused && this.credentials.has('wechat')) {
-        const saved = JSON.parse(this.credentials.read('wechat'));
-        if (!Array.isArray(saved) || saved.length > 100 || saved.some(cookie => !validCookie(cookie))) throw new Error('Invalid saved login');
-        for (const cookie of saved) {
+        const saved = decodeWechatLogin(this.credentials.read('wechat'));
+        run.localStorage = saved.localStorage;
+        for (const cookie of saved.cookies) {
           if (!run.active) return;
+          if (!run.remember || run.restoreGeneration !== this.loginGeneration) break;
           if (Number.isFinite(cookie.expirationDate) && cookie.expirationDate <= Date.now() / 1000) continue;
-          await Promise.race([run.session.cookies.set(cookieDetails(cookie)), run.cancelled]);
+          const restoring = run.session.cookies.set(cookieDetails(cookie)).then(async () => {
+            // cookies.set itself is not cancellable. Clean its late result in
+            // this not-yet-exposed partition before it can become a new run.
+            if (!run.active || !run.remember || run.restoreGeneration !== this.loginGeneration) {
+              await run.session.clearStorageData().catch(() => {});
+            }
+          });
+          await Promise.race([bounded(restoring), run.cancelled]);
           if (!run.active) return;
+          if (!run.remember || run.restoreGeneration !== this.loginGeneration) break;
           run.restored = true;
         }
       }
       if (!run.active) return;
-      this.reportLoginSession(run);
       stage = 'browser-window';
       const window = new this.BrowserWindow({ width: 1100, height: 800, minWidth: 800, minHeight: 600,
         title: '视频号后台 · 扫码后进入自己的直播间', show: this.showWindows, autoHideMenuBar: true,
@@ -136,6 +144,11 @@ class WechatCollector extends ObserverSafeEmitter {
         if (run.active && allowedPage(url) && /\/login(?:\.html$|[/?-]|$)/.test(new URL(url).pathname)) {
           this.notify(run, 'onState', { state: 'awaiting-login', error: '请在视频号后台扫码登录，再进入自己的直播间。' });
         }
+      });
+      wc.on('dom-ready', () => {
+        if (!run.active) return;
+        try { if (new URL(wc.getURL()).origin === WECHAT_LOGIN_ORIGIN) void this.removeRestoreScript(run); } catch {}
+        this.scheduleLoginSave(run);
       });
       wc.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
         // A login redirect intentionally cancels the previous document load.
@@ -152,13 +165,7 @@ class WechatCollector extends ObserverSafeEmitter {
         this.notify(run, 'onState', { state: 'stopped', error: '视频号后台窗口已关闭，采集已停止。' });
         void this.stop({ preserveSession: true });
       });
-      run.cookiesChanged = () => {
-        clearTimeout(run.savedTimer);
-        if (run.active && run.remember) {
-          run.savedTimer = setTimeout(() => { void this.saveLogin(run); }, 750);
-          run.savedTimer.unref?.();
-        }
-      };
+      run.cookiesChanged = () => this.scheduleLoginSave(run);
       run.session.cookies.on('changed', run.cookiesChanged);
       stage = 'message-listener';
       // Initialize Chromium's renderer before awaiting CDP commands. An unloaded
@@ -169,10 +176,43 @@ class WechatCollector extends ObserverSafeEmitter {
       wc.debugger.on('detach', () => {
         if (run.active && !run.closing) { this.notify(run, 'onState', { state: 'connect-failed', error: '视频号消息监听已断开，请断开后重新连接。' }); void this.stop(); }
       });
-      wc.debugger.on('message', (_event, method, params) => { void this.networkMessage(run, method, params); });
+      wc.debugger.on('message', (_event, method, params) => {
+        this.storageMessage(run, method, params);
+        void this.networkMessage(run, method, params);
+      });
       await Promise.race([wc.debugger.sendCommand('Network.enable', { maxTotalBufferSize: MAX_BODY * 2, maxResourceBufferSize: MAX_BODY }), run.cancelled]);
       if (!run.active) return;
+      await Promise.race([bounded(wc.debugger.sendCommand('DOMStorage.enable')), run.cancelled]);
+      if (!run.active) return;
+      if (!run.remember || run.restoreGeneration !== this.loginGeneration) run.localStorage = {};
+      if (!run.reused && Object.keys(run.localStorage).length) {
+        // Chromium can return a script identifier while the Page agent is
+        // disabled without running that script on the next document.
+        await Promise.race([bounded(wc.debugger.sendCommand('Page.enable')), run.cancelled]);
+        if (!run.active) return;
+        // A transient sessionStorage marker prevents a second restoration even
+        // if the first page immediately navigates before CDP removes the script.
+        // It contains no credential and is never included in the saved state.
+        run.restoreMarker = `furryup-login-restored-${randomUUID()}`;
+        const source = `(() => { if (location.origin !== ${JSON.stringify(WECHAT_LOGIN_ORIGIN)} || window !== window.top) return;
+          const marker = ${JSON.stringify(run.restoreMarker)};
+          if (sessionStorage.getItem(marker)) return;
+          sessionStorage.setItem(marker, '1');
+          const values = ${JSON.stringify(run.localStorage)};
+          for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value);
+        })();`;
+        const result = await Promise.race([bounded(wc.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source })), run.cancelled]);
+        if (!run.active) return;
+        if (typeof result?.identifier !== 'string' || !result.identifier) throw new Error('Login restoration unavailable');
+        run.restoreScript = result.identifier;
+        if (!run.remember || run.restoreGeneration !== this.loginGeneration) {
+          if (!await this.removeRestoreScript(run)) throw new Error('Cancelled login restoration unavailable');
+          run.localStorage = {};
+        } else run.restored = true;
+      }
+      this.reportLoginSession(run);
       stage = 'page-load';
+      run.canSaveLogin = true;
       this.notify(run, 'onState', { state: 'awaiting-login', error: '请在打开的视频号后台扫码登录，并进入自己的直播间。' });
       if (!run.active) return;
       await Promise.race([window.loadURL(LIVE_URL), run.cancelled]);
@@ -193,6 +233,74 @@ class WechatCollector extends ObserverSafeEmitter {
       if (run.active) this.notify(run, 'onState', { state: 'connect-failed', errorCode: `WECHAT_${stage.toUpperCase().replaceAll('-', '_')}`, error: errors[stage] });
       if (this.run === run) await this.stop();
     }
+  }
+  scheduleLoginSave(run) {
+    clearTimeout(run.savedTimer);
+    if (run.active && run.remember) {
+      run.savedTimer = setTimeout(() => {
+        // Coalesce a busy page's changes instead of growing an unbounded chain
+        // while a renderer or Cookie read is slow.
+        if (run.autoSavePending) { run.autoSaveAgain = true; return; }
+        run.autoSavePending = true;
+        void this.saveLogin(run).finally(() => {
+          run.autoSavePending = false;
+          if (run.autoSaveAgain) { run.autoSaveAgain = false; this.scheduleLoginSave(run); }
+        });
+      }, 750);
+      run.savedTimer.unref?.();
+    }
+  }
+  async removeRestoreScript(run) {
+    const identifier = run.restoreScript;
+    if (!identifier) return true;
+    if (run.removingRestoreScript) return run.removingRestoreScript;
+    run.removingRestoreScript = (async () => {
+      try {
+        await bounded(run.window.webContents.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier }));
+        run.restoreScript = '';
+        return true;
+      } catch { return false; /* The marker still prevents ordinary navigation replay. */ }
+    })().finally(() => { run.removingRestoreScript = null; });
+    return run.removingRestoreScript;
+  }
+  storageMessage(run, method, params) {
+    if (run.storageClosed || params?.storageId?.securityOrigin !== WECHAT_LOGIN_ORIGIN) return;
+    if (params.storageId.isLocalStorage === false && params.key === run.restoreMarker) {
+      void this.removeRestoreScript(run); return;
+    }
+    if (params.storageId.isLocalStorage !== true) return;
+    if (method === 'DOMStorage.domStorageItemsCleared') {
+      run.localStorage = {}; run.invalidStorageKeys.clear();
+    } else if (WECHAT_LOGIN_KEYS.includes(params.key)) {
+      if (method === 'DOMStorage.domStorageItemRemoved') {
+        delete run.localStorage[params.key]; run.invalidStorageKeys.delete(params.key);
+      } else if (method === 'DOMStorage.domStorageItemAdded' || method === 'DOMStorage.domStorageItemUpdated') {
+        if (typeof params.newValue !== 'string' || Buffer.byteLength(params.newValue, 'utf8') > MAX_STORAGE_VALUE_BYTES) {
+          run.invalidStorageKeys.add(params.key);
+        } else {
+          run.localStorage[params.key] = params.newValue; run.invalidStorageKeys.delete(params.key);
+        }
+      } else return;
+    } else return;
+    run.storageRevision++;
+    this.scheduleLoginSave(run);
+  }
+  async captureLoginStorage(run) {
+    if (!run.window || run.window.isDestroyed()) return;
+    const revision = run.storageRevision;
+    // Read only the allowlisted values, with bounds inside the renderer too.
+    // A different official origin cannot overwrite the last channels snapshot.
+    const expression = `(() => { if (location.origin !== ${JSON.stringify(WECHAT_LOGIN_ORIGIN)}) return null;
+      const result = {}; for (const key of ${JSON.stringify(WECHAT_LOGIN_KEYS)}) {
+        const value = localStorage.getItem(key); if (value === null) continue;
+        if (typeof value !== 'string' || value.length > ${MAX_STORAGE_VALUE_BYTES}) return false; result[key] = value;
+      } return result; })()`;
+    const result = await bounded(run.window.webContents.debugger.sendCommand('Runtime.evaluate',
+      { expression, returnByValue: true, timeout: 1000 }));
+    if (result.exceptionDetails) throw new Error('Login storage unavailable');
+    if (revision !== run.storageRevision || result.result?.value === null) return;
+    run.localStorage = normalizeStorage(result.result?.value);
+    run.invalidStorageKeys.clear();
   }
   loginDiagnostic(value) {
     try {
@@ -370,13 +478,21 @@ class WechatCollector extends ObserverSafeEmitter {
     }
   }
   saveLogin(run) {
+    const generation = run.loginGeneration;
+    const allowed = () => run.canSaveLogin && run.remember && generation === this.loginGeneration && generation === run.loginGeneration;
     run.saving = run.saving.then(async () => {
-      if (!run.remember) return;
+      if (!allowed()) return;
       try {
-        const cookies = (await run.session.cookies.get({})).filter(validCookie).slice(0, 100).map(cookieDetails);
-        if (!run.remember) return;
-        if (!cookies.length) { this.credentials.clear('wechat'); if (run.active) this.notify(run, 'onState', { loginSaved: false }); return; }
-        this.credentials.save('wechat', JSON.stringify(cookies));
+        await this.captureLoginStorage(run);
+        if (!allowed()) return;
+        const cookies = (await bounded(run.session.cookies.get({}))).filter(validCookie)
+          .filter(cookie => !Number.isFinite(cookie.expirationDate) || cookie.expirationDate > Date.now() / 1000);
+        if (!allowed()) return;
+        if (run.invalidStorageKeys.size) throw new Error('Invalid login storage');
+        if (!cookies.length && !Object.values(run.localStorage).some(Boolean)) {
+          this.credentials.clear('wechat'); if (run.active) this.notify(run, 'onState', { loginSaved: false }); return;
+        }
+        this.credentials.save('wechat', encodeWechatLogin(cookies, run.localStorage));
         if (run.active) this.notify(run, 'onState', { loginSaved: true });
       } catch {
         if (run.active) this.notify(run, 'onState', { error: '视频号登录记录未能加密保存，本次仍可接收，下次需重新扫码。' });
@@ -385,13 +501,16 @@ class WechatCollector extends ObserverSafeEmitter {
     return run.saving;
   }
   async setRemember(value) {
-    const run = this.run;
-    if (run) { run.remember = value === true; clearTimeout(run.savedTimer); }
-    if (!value) {
+    const generation = ++this.loginGeneration, run = this.run || this.stoppingRun;
+    if (run) { run.loginGeneration = generation; run.remember = value === true; clearTimeout(run.savedTimer); }
+    if (value !== true) {
+      // Clear synchronously, before pending renderer/Cookie reads complete. All
+      // previously queued saves belong to an older generation and cannot write.
+      this.credentials.clear('wechat');
+      if (run) void this.removeRestoreScript(run);
       if (run) await run.saving;
       await this.stopping;
-      await this.clearRetainedSession();
-      this.credentials.clear('wechat');
+      if (generation === this.loginGeneration) await this.clearRetainedSession();
     }
     else if (run) await this.saveLogin(run);
   }
@@ -403,7 +522,7 @@ class WechatCollector extends ObserverSafeEmitter {
     }
   }
   async clearRetainedSession() {
-    const retainedSession = this.retainedSession; this.retainedSession = null;
+    const retainedSession = this.retainedSession; this.retainedSession = null; this.retainedLoginState = null;
     if (retainedSession) await retainedSession.clearStorageData().catch(() => {});
   }
   async stop({ preserveSession = false, keepConnecting = false } = {}) {
@@ -415,19 +534,25 @@ class WechatCollector extends ObserverSafeEmitter {
     }
     const run = this.run;
     if (!run) { if (!preserveSession) await this.clearRetainedSession(); return; }
-    this.run = null; run.active = false; run.cancel(); clearTimeout(run.savedTimer);
+    this.run = null; this.stoppingRun = run; run.active = false; run.cancel(); clearTimeout(run.savedTimer);
     run.metadataRequests.clear(); run.giftCatalog.clear();
     run.session.cookies.removeListener('changed', run.cookiesChanged || (() => {}));
-    if (run.window && !run.window.isDestroyed()) run.window.destroy();
     this.stopping = (async () => {
+      // Checkpoint while the renderer still exists. If a user already closed
+      // the window, the bounded DOMStorage event mirror is the last snapshot.
       await this.saveLogin(run);
+      run.storageClosed = true;
+      if (run.window && !run.window.isDestroyed()) run.window.destroy();
       run.requests.clear(); run.authRequests.clear();
       // A normal disconnect stops collection, but keeps the entire transient
       // Chromium login, including official local storage. Rebuilding it from
       // Cookies alone loses part of WeChat's selected-account state.
-      if (preserveSession && run.remember) this.retainedSession = run.session;
-      else await run.session.clearStorageData().catch(() => {});
-    })().finally(() => { this.stopping = null; });
+      if (preserveSession && run.remember && run.canSaveLogin) {
+        this.retainedSession = run.session;
+        this.retainedLoginState = { localStorage: { ...run.localStorage }, invalidStorageKeys: [...run.invalidStorageKeys] };
+      } else await run.session.clearStorageData().catch(() => {});
+      run.localStorage = {}; run.invalidStorageKeys.clear();
+    })().finally(() => { this.stopping = null; this.stoppingRun = null; });
     return this.stopping;
   }
 }

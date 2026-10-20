@@ -4,7 +4,7 @@
 
 Open-source livestream event adapters for **Bilibili, Douyin, Kuaishou and WeChat Channels**. Build your own chat overlays, interactive pets, OBS components or streaming tools using a shared Node.js event interface.
 
-Version **0.2.0** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
+Version **0.2.1** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
 
 ## Try the offline demo
 
@@ -26,6 +26,8 @@ This uses explicitly labelled synthetic events for all four platforms. It demons
 The Java adapters use OrdinaryRoad **1.5.8** from Maven Central. This repository is an independent integration; it does not vendor the complete OrdinaryRoad project. WeChat uses its own Electron collector and is limited to the logged-in operator's backend. It cannot collect arbitrary third-party rooms by ID.
 
 The Java examples read connection JSON from the first stdin line. Keep stdin open until shutdown; do not use a one-shot `echo | ...` command. Credentials belong in a private process pipe, not command-line arguments, committed files or logs. EOF or Ctrl+C stops the example. See the [Chinese quick start](README.md#三平台-java-采集) for configurations.
+
+The WeChat example does not remember login. Embedders that enable `remember` must supply encrypted credential storage. Version 0.2.1 saves a bounded versioned record containing cookies and four official account-selection localStorage fields, and can still read older cookie arrays. It does not export a browser profile or retain unrelated page data. Expired sessions and platform verification still require login; await `stop()` before exiting so the final state can be saved.
 
 ## Embed the event hub
 

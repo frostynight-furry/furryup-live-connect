@@ -272,11 +272,13 @@ async function attachWechat({ BrowserWindow, session }) {
 
 构造参数另有 `showWindows=true`、`onLoginDiagnostic`。后者仅提供受限状态信息，例如登录阶段、HTTP 状态和已知数字错误码，不提供 Cookie 或原始登录响应。
 
-`connect({ remember })` 默认 `remember=true`；示例明确设为 `false`。开启记忆时，调用方必须提供同步 `credentials.has(key)`、`read(key)`、`save(key, value)`、`clear(key)`，键为 `'wechat'`，值为序列化 Cookie JSON。加密持久化由调用方实现，本库不提供凭据存储。
+`connect({ remember })` 默认 `remember=true`；示例明确设为 `false`。开启记忆时，调用方必须提供同步 `credentials.has(key)`、`read(key)`、`save(key, value)`、`clear(key)`，键为 `'wechat'`。加密持久化由调用方实现，本库不提供凭据存储；宿主不能在加密不可用时退回明文。
 
-- `await collector.stop()`：停止采集、销毁窗口并清理浏览器临时存储；若开启记忆，可保存 Cookie，但不会自动删除调用方已保存的记录。
-- `await collector.stop({ preserveSession: true })`：仅在本次 `remember=true` 时保留完整临时 Chromium 会话，供同一实例重新连接使用；不保证跨进程保留完整账号选择状态。
-- `await collector.setRemember(false)`：禁用记忆并清除调用方保存的 Cookie；仍在运行的窗口继续使用其当前会话。需要彻底结束时再 `stop()`。
+自 `0.2.1` 起，值为 UTF-8 最多 128 KiB 的 JSON：`{ schemaVersion: 2, origin: 'https://channels.weixin.qq.com', cookies, localStorage }`。`localStorage` 只允许 `finder_username`、`finder_uin`、`finder_raw`、`finder_login_token` 四个官方账号状态字段，每值最多 16 KiB；Cookie 最多 100 个且规范化后总计最多 64 KiB。`wechat/wechat-login-state.cjs` 导出校验及限额常量，宿主可以复用。旧 Cookie 数组限 24000 字节并继续兼容；首次恢复后以新格式保存。保存记录不代表平台登录仍有效，不扩大 Cookie 有效期。页面草稿、其他来源、sessionStorage 和 IndexedDB 不在保存范围内。
+
+- `await collector.stop()`：停止采集，先保存必要登录状态再销毁窗口并清理浏览器临时存储；不会自动删除调用方已保存的记录。宿主退出时必须等待此 Promise。
+- `await collector.stop({ preserveSession: true })`：仅在本次 `remember=true` 时保留完整临时 Chromium 会话，供同一实例重新连接使用；跨进程恢复依赖上述加密记录。
+- `await collector.setRemember(false)`：禁用记忆并清除调用方保存的登录记录；仍在运行的窗口继续使用其当前会话。需要彻底结束时再 `stop()`。
 - `collector.focus()`：显示并聚焦现有后台窗口。
 
 纯解析可直接调用 `decodeWechatResponse(body, request?)`，从 `wechat/wechat-decoder.cjs` 导入。`body` 是 JSON 字符串；响应没有提供房间 ID 时，`request.liveId` 可作为后备；无效或冲突的房间标识会被拒绝。成功返回 `{ roomId, events, liveStatus, errors, giftCallbacks, giftParseErrors }`；未确认房间时返回空事件，登录或协议错误可能返回 `error='LOGIN_OR_PROTOCOL'`。非法 JSON、超大响应等会抛出异常。视频号原始身份和消息编号超过 128 字符时不会截断拼接成另一个身份；无可靠消息编号时留给核心生成独立标识。纯解析不创建连接、不去重，`liveStatus` 也需要调用方按状态变化处理；建议使用现成采集器接入核心。

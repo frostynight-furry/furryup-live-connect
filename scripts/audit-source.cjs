@@ -10,7 +10,7 @@ const allowed = new Set([
   '.github/ISSUE_TEMPLATE/bug_report.yml', '.github/ISSUE_TEMPLATE/feature_request.yml', '.github/ISSUE_TEMPLATE/config.yml', '.github/PULL_REQUEST_TEMPLATE.md',
   'package.json', 'package-lock.json', 'collector/pom.xml', 'collector/src/main/resources/logback.xml',
   'licenses/ORDINARYROAD-LICENSE.txt', 'licenses/BLIVEDM-LICENSE.txt', 'licenses/WXLIVESPY-LICENSE.txt',
-  'wechat/wechat-collector.cjs', 'wechat/wechat-decoder.cjs', 'test/wechat.test.cjs',
+  'wechat/wechat-collector.cjs', 'wechat/wechat-decoder.cjs', 'wechat/wechat-login-state.cjs', 'test/wechat.test.cjs',
   'wechat/wechat-gifts.cjs', 'wechat/wechat-viewers.cjs', 'test/wechat-gifts.test.cjs', 'test/wechat-viewers.test.cjs',
   'examples/java-stdin.cjs', 'examples/wechat-electron.cjs', 'examples/subscribe.cjs', 'examples/java-subscribe.cjs',
   'examples/offline-demo.cjs', 'examples/multi-platform.cjs', 'test/examples.test.cjs',
