@@ -4,6 +4,8 @@
 
 0.4.0 扩展独立的[五平台主页与粉丝数 API](PROFILES.md)：`identifyProfile`、`resolveProfile`、`createFollowerClient`、`readDouyinPage`、`createProfileOAuth` 和 `PROFILE_PLATFORMS`。该模块不产生直播事件，小红书不支持直播采集；以下原有直播接口保持兼容。
 
+标准事件 v1 的语义合同见 [EVENTS.md](EVENTS.md) / [English](EVENTS.en.md)，机器校验见 [JSON Schema](../schemas/live-event.v1.schema.json)，离线回放见 [TESTING.md](TESTING.md)。0.6.0 新增规范与工具，既有事件 schemaVersion 仍为 1。
+
 ## 三层直播接口
 
 | 层 | 入口 | 职责 |

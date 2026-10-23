@@ -1,12 +1,27 @@
 # FurryUP LiveConnect
 
-[中文](README.md) · [API reference (中文)](docs/API.md) · [Troubleshooting (中文)](docs/TROUBLESHOOTING.md) · [Roadmap](docs/ROADMAP.md)
+[中文](README.md) · [API reference (中文)](docs/API.md) · [Troubleshooting (中文)](docs/TROUBLESHOOTING.md) · [Roadmap (中文)](docs/ROADMAP.md)
 
-Open-source **five-platform profile/follower adapters** for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu, alongside the existing four-platform livestream event API. Xiaohongshu has no live collector. Build profile pages, chat overlays, interactive pets and OBS components.
+Open-source **four-platform livestream events, a versioned contract and offline replay tools**, plus independent five-platform profile/follower adapters. Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API; test duplicate/out-of-order messages, room switches and reconnect boundaries. Profiles additionally support Xiaohongshu, which has no live collector.
 
-Version **0.4.0** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
+Version **0.6.0** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
 
-See [Profiles and followers](docs/PROFILES.md) for the new standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+See [Profiles and followers (中文)](docs/PROFILES.md) for the standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+
+## Event contract and replay tools
+
+[Event contract](docs/EVENTS.en.md) · [JSON Schema](schemas/live-event.v1.schema.json) · [Testing and replay](docs/TESTING.en.md) · [Release notes](CHANGELOG.en.md)
+
+```sh
+npm run replay
+npm run replay -- room-switch
+npm ci --ignore-scripts
+npm run test:events
+```
+
+Three replay scenarios cover concurrent four-platform duplicates/out-of-order arrivals, late old-room events and reconnect lifecycle boundaries. Reports are explicitly synthetic=true. No account, network, Java or Electron is needed for replay; every fixture is authored synthetic data. Event schemaVersion remains 1. Deduplication has time/capacity/session bounds, not durable exactly-once semantics.
+
+Chinese and English documentation for these additions share the same field names, Schema, implementation and fixtures. No private broadcaster module, user data, cutout or model resource is included. Offline tests do not certify every real platform or account.
 
 ## Try the offline demo
 
@@ -29,7 +44,7 @@ The Java adapters use OrdinaryRoad **1.5.8** from Maven Central. This repository
 
 The Java examples read connection JSON from the first stdin line. Keep stdin open until shutdown; do not use a one-shot `echo | ...` command. Credentials belong in a private process pipe, not command-line arguments, committed files or logs. EOF or Ctrl+C stops the example. See the [Chinese quick start](README.md#三平台-java-采集) for configurations.
 
-The WeChat example does not remember login. Embedders that enable `remember` must supply encrypted credential storage. Version 0.2.1 saves a bounded versioned record containing cookies and four official account-selection localStorage fields, and can still read older cookie arrays. It does not export a browser profile or retain unrelated page data. Expired sessions and platform verification still require login; await `stop()` before exiting so the final state can be saved.
+The WeChat example does not remember login. Embedders that enable `remember` must supply encrypted credential storage. Since version 0.2.1, the collector saves a bounded versioned record containing cookies and four official account-selection localStorage fields, and can still read older cookie arrays. It does not export a browser profile or retain unrelated page data. Expired sessions and platform verification still require login; await `stop()` before exiting so the final state can be saved.
 
 ## Embed the event hub
 
@@ -67,6 +82,7 @@ Avatar updates are metadata, not repeated chat or gift events. Kuaishou profile 
 ## Validate and contribute
 
 ```sh
+npm ci --ignore-scripts
 npm run test:core
 npm run test:wechat
 npm run test:examples
@@ -74,7 +90,7 @@ npm run build
 npm test
 ```
 
-Tests use synthetic data and do not join live rooms. [Contribution guidelines](CONTRIBUTING.md), [security reporting](SECURITY.md), [third-party notices](THIRD_PARTY_NOTICES.md).
+Tests use synthetic data and do not join live rooms. [Contribution guidelines (中文)](CONTRIBUTING.md), [security reporting (中文)](SECURITY.md), [third-party notices (中文)](THIRD_PARTY_NOTICES.md).
 
 ## FurryUP products
 
@@ -84,4 +100,4 @@ The standalone source in this repository is MIT licensed. FurryUP Studio's workb
 
 ### Douyin cloud browser service / 抖音云端主页读取
 
-Version 0.5.0 includes an optional isolated browser container and authenticated HTTPS adapter. No Douyin Open Platform application is needed. See [deployment and acceptance requirements](docs/BROWSER_SERVICE.md). Cloud deployment is not automatic.
+Since version 0.5.0, an optional isolated browser container and authenticated HTTPS adapter are available. No Douyin Open Platform application is needed. See [deployment and acceptance requirements (中文)](docs/BROWSER_SERVICE.md). Cloud deployment is not automatic.

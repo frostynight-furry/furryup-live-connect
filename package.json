@@ -1,8 +1,8 @@
 {
   "name": "furryup-live-connect",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "FurryUP 五平台账号主页与粉丝数组件，以及四平台直播互动采集",
+  "description": "四平台直播事件规范、合成回放与采集，以及五平台主页和粉丝数接口",
   "license": "MIT",
   "author": "FrostyNight",
   "main": "core/index.cjs",
@@ -44,9 +44,12 @@
     "demo": "node examples/offline-demo.cjs",
     "audit": "node scripts/audit-source.cjs",
     "test:profiles": "node --test test/profiles*.cjs",
-    "demo:profiles": "node examples/profile-demo.cjs"
+    "demo:profiles": "node examples/profile-demo.cjs",
+    "test:events": "node --test test/event-contract.test.cjs test/event-replay.test.cjs test/source-audit.test.cjs",
+    "replay": "node examples/replay-events.cjs"
   },
   "devDependencies": {
-    "electron": "43.1.1"
+    "ajv": "8.20.0",
+    "electron": "43.8.3"
   }
 }

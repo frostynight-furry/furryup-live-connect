@@ -1,10 +1,23 @@
-# 0.5.0
+# 更新记录
+
+[English](CHANGELOG.en.md)
+
+## 0.6.0 — 2026-10-23
+
+- 发布事件规范 v1 和覆盖 14 类标准事件的 JSON Schema，中英文语义对应；事件 schemaVersion 保持 1。
+- 增加有界离线回放工具与 CLI，覆盖四平台重复/乱序、旧房间迟到消息、重连与关闭句柄；全部数据自写合成，不启动采集器或登录。
+- 增加规范、去重 TTL/容量、房间隔离和回放回归；既有直播与主页 API 保持兼容。
+- 开源审计同时检查工作副本与真实 Git 暂存 blob/文件模式，增加暂存凭据、忽略目录及链接反例，避免携带主播端私有代码和用户数据。
+- 同步中英文项目介绍、事件规范、测试指南和当前更新说明；既有仅中文专项文档继续明确标注。
+- 开发依赖 Electron 在 43 主版本内更新至 43.8.3，修复依赖审计报告的风险；不更改本机主播端运行时。
+- 以上为离线/组件验证，不新增真实账号、平台连接或长时直播通过声明；抠图冻结，模型资源不在此次范围。
+
+## 0.5.0
 
 - Add an isolated Douyin public-page browser service and authenticated HTTPS host adapter; no platform OAuth app required.
 - Preserve observation timestamps through caching, bound browser work and reject non-public egress.
 - Include image-build and synthetic Chromium integration CI. Real cloud account acceptance remains deployment-specific.
 
-# 更新记录
 
 ## 0.4.0 — 2026-10-23
 

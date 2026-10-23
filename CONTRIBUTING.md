@@ -26,3 +26,9 @@ npm test
 请勿提交 Cookie、登录会话、访问令牌、实际观众记录、平台后台页面源码或产品私有文件。安全问题请参考 [SECURITY.md](SECURITY.md)。
 
 贡献遵循仓库的 MIT 许可证；FurryUP Studio 和其他产品未包含在该源码许可中。
+
+## 事件与双语文档
+
+新增事件语义先更新 [事件规范](docs/EVENTS.md) / [English contract](docs/EVENTS.en.md) 和对应 Schema，再添加合成用例及行为测试。用 npm run test:events 和 npm run replay 检查去重、乱序、房间及生命周期边界。
+
+README、事件规范、测试指南与当前更新说明中英文同步；字段及枚举不翻译成另一套协议。参见 [测试指南](docs/TESTING.md) / [English testing guide](docs/TESTING.en.md)。任何真实抓包、Cookie、观众资料或主播端私有文件都不得混入 fixtures。暂存后审计会读取实际 Git blob，必须与审核过的工作副本一致。
