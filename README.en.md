@@ -90,7 +90,7 @@ npm run build
 npm test
 ```
 
-Tests use synthetic data and do not join live rooms. [Contribution guidelines (中文)](CONTRIBUTING.md), [security reporting (中文)](SECURITY.md), [third-party notices (中文)](THIRD_PARTY_NOTICES.md).
+Tests use synthetic data and do not join live rooms. [Contribution guidelines (中文)](CONTRIBUTING.md), [security reporting (中文)](SECURITY.md), [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## FurryUP products
 
