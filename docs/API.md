@@ -2,7 +2,9 @@
 
 本文对应当前仓库源码。示例中的 `require('./core/index.cjs')` 假定调用文件位于仓库根目录；放到其他目录时请调整相对路径。当前通过源码使用，不要求发布或安装同名 npm 包。
 
-## 三层接口
+0.3.0 新增独立的[五平台主页与粉丝数 API](PROFILES.md)：`identifyProfile`、`createFollowerClient` 和 `PROFILE_PLATFORMS`。该模块不产生直播事件，小红书不支持直播采集；以下原有直播接口保持兼容。
+
+## 三层直播接口
 
 | 层 | 入口 | 职责 |
 | --- | --- | --- |

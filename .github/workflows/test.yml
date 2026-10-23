@@ -27,4 +27,5 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run demo
+      - run: npm run demo:profiles
       - run: node scripts/audit-source.cjs --tracked
