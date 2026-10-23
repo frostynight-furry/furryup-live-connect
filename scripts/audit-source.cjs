@@ -5,6 +5,7 @@ const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
   'profiles/index.cjs', 'profiles/model.js', 'profiles/client.js', 'profiles/transport.js',
+  'profiles/resolver.js', 'profiles/browser.js', 'profiles/oauth.js', 'test/profiles-browser.test.cjs', 'test/profiles-oauth.test.cjs',
   'test/profiles.test.cjs', 'examples/profile-demo.cjs', 'docs/PROFILES.md',
   '.gitignore', '.gitattributes', '.github/workflows/test.yml', 'LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md',
   'CONTRIBUTING.md', 'SECURITY.md', 'README.en.md', 'CHANGELOG.md',

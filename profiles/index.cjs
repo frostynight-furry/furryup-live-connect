@@ -2,4 +2,7 @@
 'use strict';
 const { PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError } = require('./model');
 const { createFollowerClient } = require('./client');
-module.exports = { PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError, createFollowerClient };
+const { resolveProfile } = require('./resolver');
+const { readDouyinPage } = require('./browser');
+const { createProfileOAuth } = require('./oauth');
+module.exports = { PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError, createFollowerClient, resolveProfile, readDouyinPage, createProfileOAuth };

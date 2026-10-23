@@ -1,6 +1,6 @@
 {
   "name": "furryup-live-connect",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "FurryUP 五平台账号主页与粉丝数组件，以及四平台直播互动采集",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "start:multi": "node examples/multi-platform.cjs",
     "demo": "node examples/offline-demo.cjs",
     "audit": "node scripts/audit-source.cjs",
-    "test:profiles": "node --test test/profiles.test.cjs",
+    "test:profiles": "node --test test/profiles*.cjs",
     "demo:profiles": "node examples/profile-demo.cjs"
   },
   "devDependencies": {

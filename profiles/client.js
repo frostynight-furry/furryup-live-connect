@@ -2,6 +2,7 @@
 
 const { identifyProfile, exactCount, snapshot, ProfileError, PROFILE_PLATFORMS } = require('./model')
 const { requestProfile } = require('./transport')
+const { resolveProfile } = require('./resolver')
 function fail(code) { throw new ProfileError(code) }
 
 // Parse only JSON-shaped hydration data; never evaluate JavaScript from a page.
@@ -57,10 +58,11 @@ function createFollowerClient(options = {}) {
   const limit = options.maxEntries === undefined ? 256 : options.maxEntries
   if (!Number.isSafeInteger(interval) || interval < 0 || interval > 86400000 || !Number.isSafeInteger(limit) || limit < 1 || limit > 4096) throw new TypeError('Invalid cache limits')
   const cache = new Map(), running = new Map(), platformNext = new Map()
+  const browserDouyin = options.allowPublicDouyin === true && typeof options.readPublicProfile === 'function'
   const capabilities = () => PROFILE_PLATFORMS.map(platform => ({
-    platform, mode: platform === 'wechat_channels' ? 'manual' : ['douyin', 'kuaishou'].includes(platform) ? 'oauth' : 'public_experimental',
+    platform, mode: platform === 'wechat_channels' ? 'manual' : platform === 'douyin' && browserDouyin ? 'browser_experimental' : ['douyin', 'kuaishou'].includes(platform) ? 'oauth' : 'public_experimental',
     configured: platform === 'bilibili' ? options.allowPublicBilibili === true : platform === 'xiaohongshu' ? options.allowPublicXiaohongshu === true :
-      platform === 'wechat_channels' ? false : typeof options.resolveAuthorization === 'function',
+      platform === 'wechat_channels' ? false : platform === 'douyin' && browserDouyin || typeof options.resolveAuthorization === 'function',
     liveCollection: false
   }))
   async function acquire(profile, context) {
@@ -70,7 +72,7 @@ function createFollowerClient(options = {}) {
       return { ...profile, status: 'not_configured', followerCount: null, attemptedAt: fetchedAt }
     }
     let authorization
-    if (['douyin', 'kuaishou'].includes(platform)) {
+    if (['douyin', 'kuaishou'].includes(platform) && !(platform === 'douyin' && browserDouyin)) {
       authorization = typeof options.resolveAuthorization === 'function' && await options.resolveAuthorization({ ...profile }, context)
       // Only the trusted host resolves credentials, bound to this exact URL identity.
       if (!authorization || authorization.accountId !== profile.accountId || authorization.platform !== platform ||
@@ -98,6 +100,10 @@ function createFollowerClient(options = {}) {
           if (!body || body.code !== 0 || !body.data) fail('UPSTREAM_UNAVAILABLE')
           if (String(body.data.mid) !== profile.accountId) fail('ACCOUNT_MISMATCH')
           followerCount = exactCount(body.data.follower); source = 'public_api'
+        } else if (platform === 'douyin' && browserDouyin) {
+          const body = await options.readPublicProfile({ ...profile }, context)
+          if (!body || body.platform !== platform || body.accountId !== profile.accountId || body.profileUrl !== profile.profileUrl) fail('ACCOUNT_MISMATCH')
+          followerCount = exactCount(body.followerCount); source = 'public_page'
         } else if (platform === 'douyin') {
           const query = new URLSearchParams({ open_id: authorization.openId, date_type: '7' })
           const body = await request({ url: 'https://open.douyin.com/data/external/user/fans/?' + query, headers: { 'access-token': authorization.accessToken } })
@@ -126,8 +132,10 @@ function createFollowerClient(options = {}) {
     running.set(key, work)
     try { return { ...await work } } finally { running.delete(key) }
   }
-  return { capabilities, async lookup(input, context) {
-    const profile = identifyProfile(input)
+  const canResolve = options.allowPublicBilibili || browserDouyin || typeof options.resolveAuthorization === 'function'
+  return { capabilities, resolveProfile: input => canResolve ? resolveProfile(input, options.requestRedirect) : identifyProfile(input), async lookup(input, context) {
+    // Share resolution is explicit network I/O and remains opt-in with a provider.
+    const profile = canResolve ? await resolveProfile(input, options.requestRedirect) : identifyProfile(input)
     try { return await acquire(profile, context) }
     catch (_) { return { ...profile, status: 'unavailable', followerCount: null, attemptedAt: now(), errorCode: 'UPSTREAM_UNAVAILABLE' } }
   } }
