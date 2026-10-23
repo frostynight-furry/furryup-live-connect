@@ -1,6 +1,6 @@
 # Five-platform profiles / 五平台主页与粉丝数
 
-Version 0.4.0 provides profile/follower adapters for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu. The existing live collectors support four platforms. **There is no Xiaohongshu live collector.** Five identifiers do not mean five automatic count APIs.
+Version 0.5.0 provides profile/follower adapters for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu. The existing live collectors support four platforms. **There is no Xiaohongshu live collector.** Five identifiers do not mean five automatic count APIs.
 
 | Platform | Acquisition | Requirement |
 | --- | --- | --- |
@@ -92,3 +92,7 @@ Never accept credentials or a claimed binding from a client. Authorization is re
 - `npm run test:profiles` and `npm run demo:profiles` are offline. Regression tests cover redirect attacks, page identity, rounded counts, tenant-bound state, replay, encryption, rotation and revocation races. They do not substitute for live OAuth or native client acceptance.
 
 Official references: [Douyin exchange](https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-access-token/), [Douyin refresh](https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/refresh-access-token), [Douyin user info](https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info), [Douyin fans](https://open.douyin.com/platform/resource/docs/openapi/data-open-service/user-data/get-user-fans-count), [Kuaishou OAuth](https://open.kuaishou.com/platform/openApi?menu=13), [Kuaishou website flow](https://open.kuaishou.com/platformDocs/develop/web-app.html). MIT licensing does not itself authorize platform access.
+
+## Cloud browser service (0.5.0)
+
+A runnable isolated browser service and HTTPS host adapter are now included. See [browser service setup](BROWSER_SERVICE.md) for configuration, deadlines, cache timestamps, security limits and cloud acceptance. No Douyin application registration is required for this path.

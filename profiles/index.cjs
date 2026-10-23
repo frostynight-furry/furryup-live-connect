@@ -5,4 +5,6 @@ const { createFollowerClient } = require('./client');
 const { resolveProfile } = require('./resolver');
 const { readDouyinPage } = require('./browser');
 const { createProfileOAuth } = require('./oauth');
-module.exports = { PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError, createFollowerClient, resolveProfile, readDouyinPage, createProfileOAuth };
+const { createBrowserServiceReader } = require('./service-client');
+const { createConfiguredFollowerClient } = require('./provider');
+module.exports = { PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError, createFollowerClient, resolveProfile, readDouyinPage, createProfileOAuth, createBrowserServiceReader, createConfiguredFollowerClient };

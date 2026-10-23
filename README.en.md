@@ -81,3 +81,7 @@ Tests use synthetic data and do not join live rooms. [Contribution guidelines](C
 Develop your own tools with LiveConnect, or explore the complete [FurryUP Studio](https://github.com/frostynight-furry/furryup-studio-releases) application and [FurryUP desktop pet](https://github.com/frostynight-furry/furryup-desktop-pet-releases). [Official website](https://frostynight.top/furryup).
 
 The standalone source in this repository is MIT licensed. FurryUP Studio's workbench, complete OBS workflow, assistant, character interactions and account services are outside this repository. Product branding and screenshots retain their separate rights.
+
+### Douyin cloud browser service / 抖音云端主页读取
+
+Version 0.5.0 includes an optional isolated browser container and authenticated HTTPS adapter. No Douyin Open Platform application is needed. See [deployment and acceptance requirements](docs/BROWSER_SERVICE.md). Cloud deployment is not automatic.

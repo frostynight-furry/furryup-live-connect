@@ -218,3 +218,7 @@ const unsubscribeAvatars = live.subscribeAvatars(update => {
 [![FurryUP Studio 四平台工作台，使用示例消息](https://raw.githubusercontent.com/frostynight-furry/furryup-studio-releases/main/assets/screenshots/live-workbench.png)](https://github.com/frostynight-furry/furryup-studio-releases#界面预览)
 
 做出了自己的工具？欢迎按[案例提交说明](docs/SHOWCASE.md)提供公开项目链接。我们会区分官方产品和独立社区项目，不将未接入的项目标记为用户案例。
+
+### Douyin cloud browser service / 抖音云端主页读取
+
+Version 0.5.0 includes an optional isolated browser container and authenticated HTTPS adapter. No Douyin Open Platform application is needed. See [deployment and acceptance requirements](docs/BROWSER_SERVICE.md). Cloud deployment is not automatic.

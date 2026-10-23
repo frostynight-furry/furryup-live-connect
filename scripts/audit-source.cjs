@@ -4,6 +4,9 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
+  'profiles/service-client.js', 'profiles/provider.js', 'test/profiles-service.test.cjs', 'scripts/test-profile-browser-fixture.cjs',
+  'browser-service/server.js', 'browser-service/reader.js', 'browser-service/egress.js', 'browser-service/package.json', 'browser-service/package-lock.json',
+  'browser-service/Dockerfile', 'docs/BROWSER_SERVICE.md', '.dockerignore',
   'profiles/index.cjs', 'profiles/model.js', 'profiles/client.js', 'profiles/transport.js',
   'profiles/resolver.js', 'profiles/browser.js', 'profiles/oauth.js', 'test/profiles-browser.test.cjs', 'test/profiles-oauth.test.cjs',
   'test/profiles.test.cjs', 'examples/profile-demo.cjs', 'docs/PROFILES.md',
