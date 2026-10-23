@@ -128,3 +128,13 @@ test('browser deadline closes an in-progress context and returns no count', asyn
   const reader = createBrowserReader({ newContext: async () => context }, { timeoutMs: 10 })
   await assert.rejects(reader(profile), { code: 'BROWSER_TIMEOUT' }); assert.ok(closed > 0)
 })
+
+test('a hung context creation recycles the browser and closes any context that arrives after the deadline', async () => {
+  let finish, recycled = 0, closed = 0
+  const browser = { newContext: () => new Promise(resolve => { finish = resolve }), close: async () => { recycled++ } }
+  await assert.rejects(createBrowserReader(browser, { timeoutMs: 10 })(profile), { code: 'BROWSER_TIMEOUT' })
+  assert.equal(recycled, 1)
+  finish({ close: async () => { closed++ } })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(closed, 1)
+})

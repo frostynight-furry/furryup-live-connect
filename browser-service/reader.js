@@ -49,14 +49,20 @@ function createBrowserReader(browser, options = {}) {
       await page.goto(profile.profileUrl, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
       await page.waitForFunction(() => {
         const visible = e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0
-        return [...document.querySelectorAll('[data-e2e="user-info"] [data-e2e="user-info-fans"], iframe[src*="captcha"], iframe[src*="verify"], [id*="captcha_container"], [class*="captcha_verify"]')].some(visible)
+        const challenge = [...document.querySelectorAll('iframe[src*="captcha"], iframe[src*="verify"], [id*="captcha_container"], [class*="captcha_verify"]')].some(visible)
+        const cards = [...document.querySelectorAll('[data-e2e="user-info"] [data-e2e="user-info-fans"]')]
+        return challenge || cards.some(card => visible(card) && /^粉丝\s+\S+/.test(card.innerText.trim()))
       }, null, { timeout: timeoutMs })
       const result = await readDouyinPage(page, profile)
       return { ...result, observedAt: new Date().toISOString() }
     })()
     try {
       return await Promise.race([work, new Promise((_, reject) => {
-        timer = setTimeout(() => { expired = true; void close(); reject(new ProfileError('BROWSER_TIMEOUT')) }, timeoutMs)
+        timer = setTimeout(() => {
+          expired = true
+          if (!context) void browser.close()
+          void close(); reject(new ProfileError('BROWSER_TIMEOUT'))
+        }, timeoutMs)
       })])
     } finally { expired = true; clearTimeout(timer); await close() }
   }

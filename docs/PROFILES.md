@@ -1,6 +1,6 @@
 # Five-platform profiles / 五平台主页与粉丝数
 
-Version 0.4.0 provides profile/follower adapters for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu. The existing live collectors support four platforms. **There is no Xiaohongshu live collector.** Five identifiers do not mean five automatic count APIs.
+Version 0.5.0 provides profile/follower adapters for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu. The existing live collectors support four platforms. **There is no Xiaohongshu live collector.** Five identifiers do not mean five automatic count APIs.
 
 | Platform | Acquisition | Requirement |
 | --- | --- | --- |

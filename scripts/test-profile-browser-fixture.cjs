@@ -34,6 +34,8 @@ async function main() {
     assert.equal(result.status, 'ok'); assert.equal(result.followerCount, 8650); assert.equal(result.source, 'public_page')
     assert.equal((await client.lookup(profileUrl)).fetchedAt, result.fetchedAt); assert.equal(reads, 1)
     const direct = createBrowserReader(fixtureBrowser)
+    html = '<div data-e2e="user-info"><div data-e2e="user-info-fans">粉丝</div></div><script>setTimeout(() => document.querySelector(\'[data-e2e="user-info-fans"]\').innerText = "粉丝 0", 200)</script>'
+    assert.equal((await direct(profileUrl)).followerCount, 0)
     html = '<div data-e2e="user-info"><div data-e2e="user-info-fans">粉丝 8.6万</div></div>'
     await assert.rejects(direct(profileUrl), { code: 'EXACT_COUNT_UNAVAILABLE' })
     html = '<div id="captcha_container">合成验证码页面</div>'
