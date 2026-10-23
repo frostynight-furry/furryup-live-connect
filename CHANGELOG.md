@@ -1,3 +1,9 @@
+# 0.5.0
+
+- Add an isolated Douyin public-page browser service and authenticated HTTPS host adapter; no platform OAuth app required.
+- Preserve observation timestamps through caching, bound browser work and reject non-public egress.
+- Include image-build and synthetic Chromium integration CI. Real cloud account acceptance remains deployment-specific.
+
 # 更新记录
 
 ## 0.4.0 — 2026-10-23

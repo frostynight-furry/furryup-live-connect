@@ -1,0 +1,11 @@
+*
+!browser-service/
+browser-service/*
+!browser-service/*.js
+!browser-service/package.json
+!browser-service/package-lock.json
+!browser-service/Dockerfile
+!profiles/
+profiles/*
+!profiles/model.js
+!profiles/browser.js

@@ -19,7 +19,7 @@ async function readDouyinPage(page, input) {
   const observation = await page.evaluate(() => {
     const cards = document.querySelectorAll('[data-e2e="user-info"] [data-e2e="user-info-fans"]')
     const visible = element => !!element && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0
-    const challenge = Array.from(document.querySelectorAll('iframe[src*="captcha"], iframe[src*="verify"]')).some(visible)
+    const challenge = Array.from(document.querySelectorAll('iframe[src*="captcha"], iframe[src*="verify"], [id*="captcha_container"], [class*="captcha_verify"]')).some(visible)
     return { profileUrl: location.href, cardCount: cards.length, followerText: cards.length === 1 && visible(cards[0]) ? cards[0].innerText : '', requiresInteraction: challenge }
   })
   return parseDouyinObservation(observation, input)

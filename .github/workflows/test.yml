@@ -6,6 +6,34 @@ on:
 permissions:
   contents: read
 jobs:
+  browser:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated browser service
+        run: docker build -f browser-service/Dockerfile -t follower-browser:test .
+      - name: Chromium sandbox profile
+        run: curl --fail --location https://raw.githubusercontent.com/microsoft/playwright/v1.64.0/utils/docker/seccomp_profile.json -o "$RUNNER_TEMP/browser-seccomp.json"
+      - name: Synthetic Chromium and HTTP integration (no platform requests)
+        run: >-
+          docker run --rm --init --shm-size=256m --memory=1g
+          --security-opt seccomp="$RUNNER_TEMP/browser-seccomp.json"
+          -e NODE_PATH=/app/browser-service/node_modules
+          -v "$PWD/profiles:/app/profiles:ro"
+          -v "$PWD/scripts/test-profile-browser-fixture.cjs:/app/scripts/test-profile-browser-fixture.cjs:ro"
+          follower-browser:test node /app/scripts/test-profile-browser-fixture.cjs
+      - name: Service startup with protected egress
+        run: |
+          docker run -d --name follower-browser --init --shm-size=256m --memory=1g --security-opt seccomp="$RUNNER_TEMP/browser-seccomp.json" -e FUP_BROWSER_SERVICE_TOKEN=synthetic_ci_token_not_a_production_credential_12345 follower-browser:test
+          for i in $(seq 1 15); do
+            if docker exec follower-browser node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then exit 0; fi
+            sleep 1
+          done
+          docker logs follower-browser
+          exit 1
+      - if: always()
+        run: docker rm -f follower-browser || true
   test:
     strategy:
       matrix:

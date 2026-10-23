@@ -1,6 +1,6 @@
 'use strict'
 
-const { identifyProfile, exactCount, snapshot, ProfileError, PROFILE_PLATFORMS } = require('./model')
+const { identifyProfile, exactCount, isoTime, snapshot, ProfileError, PROFILE_PLATFORMS } = require('./model')
 const { requestProfile } = require('./transport')
 const { resolveProfile } = require('./resolver')
 function fail(code) { throw new ProfileError(code) }
@@ -66,9 +66,13 @@ function createFollowerClient(options = {}) {
     liveCollection: false
   }))
   async function acquire(profile, context) {
-    const fetchedAt = now(), platform = profile.platform
+    let fetchedAt = now()
+    const platform = profile.platform
     if (platform === 'wechat_channels') return { ...profile, status: 'manual_required', followerCount: null, attemptedAt: fetchedAt }
     if (platform === 'bilibili' && !options.allowPublicBilibili || platform === 'xiaohongshu' && !options.allowPublicXiaohongshu) {
+      return { ...profile, status: 'not_configured', followerCount: null, attemptedAt: fetchedAt }
+    }
+    if (platform === 'douyin' && options.allowPublicDouyin && !browserDouyin && typeof options.resolveAuthorization !== 'function') {
       return { ...profile, status: 'not_configured', followerCount: null, attemptedAt: fetchedAt }
     }
     let authorization
@@ -104,6 +108,11 @@ function createFollowerClient(options = {}) {
           const body = await options.readPublicProfile({ ...profile }, context)
           if (!body || body.platform !== platform || body.accountId !== profile.accountId || body.profileUrl !== profile.profileUrl) fail('ACCOUNT_MISMATCH')
           followerCount = exactCount(body.followerCount); source = 'public_page'
+          if (body.observedAt !== undefined) {
+            const observedAt = isoTime(body.observedAt), age = Date.parse(now()) - Date.parse(observedAt)
+            if (age < 0 || age > 120000) fail('INVALID_OBSERVATION')
+            fetchedAt = observedAt; dataAsOf = observedAt
+          }
         } else if (platform === 'douyin') {
           const query = new URLSearchParams({ open_id: authorization.openId, date_type: '7' })
           const body = await request({ url: 'https://open.douyin.com/data/external/user/fans/?' + query, headers: { 'access-token': authorization.accessToken } })
