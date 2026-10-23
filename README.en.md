@@ -4,9 +4,9 @@
 
 Open-source **five-platform profile/follower adapters** for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu, alongside the existing four-platform livestream event API. Xiaohongshu has no live collector. Build profile pages, chat overlays, interactive pets and OBS components.
 
-Version **0.3.0** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
+Version **0.4.0** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
 
-See [Profiles and followers](docs/PROFILES.md) for the new standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin/Kuaishou require host-managed OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+See [Profiles and followers](docs/PROFILES.md) for the new standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
 
 ## Try the offline demo
 

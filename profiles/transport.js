@@ -4,16 +4,18 @@ const https = require('node:https')
 const { ProfileError } = require('./model')
 const ENDPOINTS = Object.freeze({
   'api.bilibili.com': /^\/x\/relation\/stat$/,
-  'open.douyin.com': /^\/data\/external\/user\/fans\/$/,
-  'open.kuaishou.com': /^\/openapi\/user_info$/,
+  'open.douyin.com': /^\/(?:data\/external\/user\/fans|oauth\/(?:access_token|refresh_token|userinfo))\/$/,
+  'open.kuaishou.com': /^\/(?:openapi\/user_info|oauth2\/(?:access_token|refresh_token))$/,
   'www.xiaohongshu.com': /^\/user\/profile\/[a-f0-9]{24}$/
 })
 // Never request a user-supplied URL. Only these fixed, adapter-built endpoints.
-function requestProfile({ url, headers = {}, format = 'json', signal } = {}) {
+function requestProfile({ url, headers = {}, format = 'json', signal, method = 'GET', body } = {}) {
   let target
   try { target = new URL(url) } catch (_) { return Promise.reject(new ProfileError('INVALID_ENDPOINT')) }
   if (target.protocol !== 'https:' || target.username || target.password || target.port || target.hash ||
-      !Object.hasOwn(ENDPOINTS, target.hostname) || !ENDPOINTS[target.hostname].test(target.pathname)) {
+      !Object.hasOwn(ENDPOINTS, target.hostname) || !ENDPOINTS[target.hostname].test(target.pathname) ||
+      method !== (target.hostname === 'open.douyin.com' && target.pathname.startsWith('/oauth/') ? 'POST' : 'GET') ||
+      (body !== undefined && (method !== 'POST' || typeof body !== 'string' || Buffer.byteLength(body) > 16384))) {
     return Promise.reject(new ProfileError('INVALID_ENDPOINT'))
   }
   return new Promise((resolve, reject) => {
@@ -23,7 +25,9 @@ function requestProfile({ url, headers = {}, format = 'json', signal } = {}) {
       settled = true; clearTimeout(timer)
       if (error) reject(error); else resolve(value)
     }
-    const req = https.get(target, { signal, headers: { Accept: format === 'html' ? 'text/html' : 'application/json', 'Accept-Encoding': 'identity', 'User-Agent': 'FurryUP-Profile/0.3', ...headers } }, res => {
+    const send = method === 'GET' ? https.get : https.request
+    const req = send(target, { signal, method, headers: { Accept: format === 'html' ? 'text/html' : 'application/json', 'Accept-Encoding': 'identity', 'User-Agent': 'FurryUP-Profile/0.3', ...headers,
+      ...(body === undefined ? {} : { 'Content-Length': Buffer.byteLength(body) }) } }, res => {
       if (res.statusCode !== 200) {
         finish(new ProfileError([403, 412, 429].includes(res.statusCode) ? 'RATE_LIMITED' : 'UPSTREAM_UNAVAILABLE'))
         res.destroy(); req.destroy()
@@ -46,6 +50,7 @@ function requestProfile({ url, headers = {}, format = 'json', signal } = {}) {
     })
     timer = setTimeout(() => { finish(new ProfileError('UPSTREAM_TIMEOUT')); req.destroy() }, 8000)
     req.on('error', () => finish(new ProfileError('UPSTREAM_UNAVAILABLE')))
+    if (method === 'POST') req.end(body)
   })
 }
 module.exports = { requestProfile }

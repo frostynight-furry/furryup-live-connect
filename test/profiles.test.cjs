@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const { identifyProfile, exactCount, PROFILE_PLATFORMS } = require('../profiles/model')
 const { createFollowerClient, xiaohongshuCount } = require('../profiles/client')
 const { requestProfile } = require('../profiles/transport')
+const { resolveProfile, requestBilibiliRedirect } = require('../profiles/resolver')
 const time = '2026-10-23T08:00:00.000Z'
 const xhs = '0123456789abcdef01234567'
 const urls = {
@@ -30,6 +31,30 @@ test('five profile platforms accept canonical homepages, keep IDs as strings and
 test('only exact, bounded counts are accepted; missing is never zero', () => {
   assert.equal(exactCount(0), 0); assert.equal(exactCount('0'), 0); assert.equal(exactCount('123'), 123)
   for (const value of [undefined, null, '', false, true, {}, [], '1.2万', '123+', '1,234', -1, 1.1, Infinity, 10000000001]) assert.throws(() => exactCount(value))
+})
+test('Bilibili mobile and short links normalize without following arbitrary redirects', async () => {
+  assert.equal(identifyProfile('https://m.bilibili.com/space/123?share=x').profileUrl, urls.bilibili)
+  let calls = 0
+  const redirect = async url => { calls++; assert.equal(url, 'https://b23.tv/abc123'); return 'https://m.bilibili.com/space/123?tracking=discard' }
+  const result = await resolveProfile('https://b23.tv/abc123', redirect)
+  assert.equal(result.profileUrl, urls.bilibili); assert.equal(calls, 1)
+  for (const target of ['http://space.bilibili.com/123', 'https://127.0.0.1/', 'https://space.bilibili.com.evil.invalid/123',
+    'https://space.bilibili.com@127.0.0.1/123', 'https://b23.tv/again', 'https://www.bilibili.com/video/BV123',
+    'https://m.bilibili.com/space/123/../settings', 'https://m.bilibili.com:444/space/123']) {
+    await assert.rejects(resolveProfile('https://b23.tv/abc123', async () => target), { code: 'UNSUPPORTED_PROFILE_URL' })
+  }
+  await assert.rejects(resolveProfile({ platform: 'douyin', profileUrl: 'https://b23.tv/abc123' }, redirect), { code: 'PLATFORM_MISMATCH' })
+  for (const url of ['https://127.0.0.1/', 'https://b23.tv/a?redirect=evil', 'https://b23.tv:443/a']) await assert.rejects(requestBilibiliRedirect(url))
+  assert.equal(calls, 1)
+})
+test('short-link lookup fetches the resolved account once and does no I/O when disabled', async () => {
+  let calls = 0
+  const options = { requestRedirect: async () => { calls++; return 'https://m.bilibili.com/space/123' },
+    request: async () => ({ code: 0, data: { mid: 123, follower: 9 } }) }
+  await assert.rejects(createFollowerClient(options).lookup('https://b23.tv/abc123'), { code: 'FULL_PROFILE_URL_REQUIRED' })
+  assert.equal(calls, 0)
+  const result = await createFollowerClient({ ...options, allowPublicBilibili: true }).lookup('https://b23.tv/abc123')
+  assert.equal(result.profileUrl, urls.bilibili); assert.equal(result.followerCount, 9); assert.equal(calls, 1)
 })
 test('Bilibili fetch uses a fixed endpoint, validates returned identity and projects only the count', async () => {
   const calls = []
