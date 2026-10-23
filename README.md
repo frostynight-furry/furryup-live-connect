@@ -4,15 +4,17 @@
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.12-43853d.svg)](package.json)
 
-**为开发者提供 B站、抖音、快手、视频号四平台直播互动采集能力。** 用统一事件构建自己的弹幕工具、互动桌宠、OBS 组件和定制直播工具箱。
+**五平台账号资料与粉丝数组件，保留 B站、抖音、快手、视频号四平台直播互动采集。** 新增小红书主页适配，不包含小红书直播采集。用统一接口构建个人主页、弹幕工具、互动桌宠和 OBS 组件。
 
-Open-source livestream event adapters for Bilibili, Douyin, Kuaishou and WeChat Channels, with a shared Node.js event API. MIT licensed.
+Five-platform profile/follower adapters plus four-platform livestream events, with a shared Node.js API. MIT licensed. Platform-specific authorization and availability limits apply.
 
 [FurryUP 官网](https://frostynight.top/furryup) · [FurryUP Studio 下载](https://github.com/frostynight-furry/furryup-studio-releases) · [FurryUP 桌宠](https://github.com/frostynight-furry/furryup-desktop-pet-releases) · [参与贡献](CONTRIBUTING.md)
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-版本 `0.2.1`。包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+版本 `0.3.0`。新增独立的[五平台主页与粉丝数模块](docs/PROFILES.md)，包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+
+粉丝数能力按平台区分：B站公开接口、小红书公开主页为需显式开启的实验适配；抖音与快手需要宿主完成官方授权；视频号保留手动模式。五个平台均有明确的识别/状态接口，不代表五个平台都能仅凭链接自动获取。运行 `npm run demo:profiles` 查看不联网的合成示例，运行 `npm run test:profiles` 验证新模块。
 
 本目录通过 Maven 使用 OrdinaryRoad 已发布的三个模块，**没有复制完整 OrdinaryRoad 项目，也不是它的官方维护仓库**。FurryUP Studio 主程序、插件管理器、账户服务、直播助手、弹幕气泡和礼物特效不在拆分范围内。
 

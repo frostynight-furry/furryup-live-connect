@@ -1,16 +1,34 @@
 {
   "name": "furryup-live-connect",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
-  "description": "FurryUP 四平台直播互动采集：B站、抖音、快手、视频号，统一事件与头像补全",
+  "description": "FurryUP 五平台账号主页与粉丝数组件，以及四平台直播互动采集",
   "license": "MIT",
   "author": "FrostyNight",
   "main": "core/index.cjs",
-  "repository": { "type": "git", "url": "https://github.com/frostynight-furry/furryup-live-connect.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frostynight-furry/furryup-live-connect.git"
+  },
   "homepage": "https://github.com/frostynight-furry/furryup-live-connect#readme",
-  "bugs": { "url": "https://github.com/frostynight-furry/furryup-live-connect/issues" },
-  "keywords": ["furryup", "livestream", "danmaku", "bilibili", "douyin", "kuaishou", "wechat"],
-  "engines": { "node": ">=22.12.0" },
+  "bugs": {
+    "url": "https://github.com/frostynight-furry/furryup-live-connect/issues"
+  },
+  "keywords": [
+    "furryup",
+    "livestream",
+    "danmaku",
+    "bilibili",
+    "douyin",
+    "kuaishou",
+    "wechat",
+    "xiaohongshu",
+    "followers",
+    "profile"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "build": "node scripts/build-java.cjs",
     "test": "node scripts/test.cjs",
@@ -24,7 +42,11 @@
     "start:subscribe": "node examples/subscribe.cjs",
     "start:multi": "node examples/multi-platform.cjs",
     "demo": "node examples/offline-demo.cjs",
-    "audit": "node scripts/audit-source.cjs"
+    "audit": "node scripts/audit-source.cjs",
+    "test:profiles": "node --test test/profiles.test.cjs",
+    "demo:profiles": "node examples/profile-demo.cjs"
   },
-  "devDependencies": { "electron": "43.1.1" }
+  "devDependencies": {
+    "electron": "43.1.1"
+  }
 }
