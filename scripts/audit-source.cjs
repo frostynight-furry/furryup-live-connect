@@ -4,6 +4,9 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
+  'schemas/live-event.v1.schema.json', 'testing/index.cjs', 'testing/replay.cjs', 'testing/scenarios.cjs',
+  'examples/replay-events.cjs', 'test/event-contract.test.cjs', 'test/event-replay.test.cjs', 'test/source-audit.test.cjs',
+  'docs/EVENTS.md', 'docs/EVENTS.en.md', 'docs/TESTING.md', 'docs/TESTING.en.md', 'CHANGELOG.en.md',
   'profiles/service-client.js', 'profiles/provider.js', 'test/profiles-service.test.cjs', 'scripts/test-profile-browser-fixture.cjs',
   'browser-service/server.js', 'browser-service/reader.js', 'browser-service/egress.js', 'browser-service/package.json', 'browser-service/package-lock.json',
   'browser-service/Dockerfile', 'docs/BROWSER_SERVICE.md', '.dockerignore',
@@ -32,33 +35,69 @@ for (const name of ['BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMain
   'ExpandedEvent', 'KuaishouAvatar', 'KuaishouExtraEvents', 'PkEvents', 'PlatformEvent', 'ViewerSnapshots'])
   allowed.add(`collector/src/test/java/local/furryup/${name}Fixture.java`);
 const skipped = new Set(['.git', 'node_modules', 'collector/target']);
-const findings = [], inventory = [];
-function walk(relative = '') {
-  for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
-    const name = relative ? `${relative}/${entry.name}` : entry.name;
-    if (skipped.has(name)) continue;
-    if (entry.isSymbolicLink()) { findings.push(`Symlink not allowed: ${name}`); continue; }
-    if (entry.isDirectory()) { walk(name); continue; }
-    if (!allowed.has(name)) { findings.push(`Not in source allowlist: ${name}`); continue; }
-    const body = fs.readFileSync(path.join(root, name));
-    let text;
-    try { text = new TextDecoder('utf-8', { fatal: true }).decode(body); }
-    catch { findings.push(`Non UTF-8 source: ${name}`); continue; }
-    if (body.includes(0)) findings.push(`Binary content: ${name}`);
-    if (name !== 'scripts/audit-source.cjs' && /(?:[A-Za-z]:[\\/]Users[\\/]|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/.test(text))
-      findings.push(`Local path or credential-like material: ${name}`);
-    inventory.push({ path: name, bytes: body.length, sha256: createHash('sha256').update(body).digest('hex') });
+function auditBytes(name, body) {
+  const findings = [];
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(body); }
+  catch { return ['Non UTF-8 source']; }
+  if (body.includes(0)) findings.push('Binary content');
+  if (name !== 'scripts/audit-source.cjs') {
+    if (/(?:[A-Za-z]:[\\/]Users[\\/]|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/.test(text))
+      findings.push('Local path or credential-like material');
+    if (/(?:require\s*\(|from\s+)['"][^'"]*(?:apps\/furryup-studio|private-training|commerce-manager|plugin-runtime-loader)/.test(text))
+      findings.push('Private product runtime import');
+  }
+  return findings;
+}
+function auditSource(directory = root, { tracked = false } = {}) {
+  const findings = [], inventory = [];
+  function walk(relative = '') {
+    for (const entry of fs.readdirSync(path.join(directory, relative), { withFileTypes: true })) {
+      const name = relative ? `${relative}/${entry.name}` : entry.name;
+      if (skipped.has(name)) continue;
+      if (entry.isSymbolicLink()) { findings.push(`Symlink not allowed: ${name}`); continue; }
+      if (entry.isDirectory()) { walk(name); continue; }
+      if (!allowed.has(name)) { findings.push(`Not in source allowlist: ${name}`); continue; }
+      const body = fs.readFileSync(path.join(directory, name));
+      findings.push(...auditBytes(name, body).map(reason => `${reason}: ${name}`));
+      inventory.push({ path: name, bytes: body.length, sha256: createHash('sha256').update(body).digest('hex') });
+    }
+  }
+  walk();
+  for (const name of allowed) if (name !== 'package-lock.json' && !inventory.some(item => item.path === name))
+    findings.push(`Required source missing: ${name}`);
+  if (tracked) {
+    const { execFileSync } = require('node:child_process');
+    const git = args => execFileSync('git', args, { cwd: directory, windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
+    const entries = git(['ls-files', '--stage', '-z']).toString('utf8').split('\0').filter(Boolean);
+    const indexed = new Set();
+    for (const entry of entries) {
+      const match = /^(\d+) ([a-f0-9]+) (\d)\t(.+)$/.exec(entry);
+      if (!match) { findings.push('Invalid Git index entry'); continue; }
+      const [, mode, oid, stage, name] = match;
+      indexed.add(name);
+      if (!allowed.has(name)) { findings.push(`Tracked path outside source allowlist: ${name}`); continue; }
+      if (!['100644', '100755'].includes(mode) || stage !== '0') { findings.push(`Invalid index mode/stage: ${name}`); continue; }
+      // Inspect exact staged bytes; a clean working copy cannot hide an earlier staged secret.
+      const body = git(['cat-file', 'blob', oid]);
+      findings.push(...auditBytes(name, body).map(reason => `Staged ${reason}: ${name}`));
+      const actual = inventory.find(item => item.path === name);
+      if (!actual || actual.sha256 !== createHash('sha256').update(body).digest('hex'))
+        findings.push(`Staged content differs from audited working copy: ${name}`);
+    }
+    for (const name of allowed) if (!indexed.has(name)) findings.push(`Required source not tracked: ${name}`);
+  }
+  return { findings, inventory: inventory.sort((a, b) => a.path.localeCompare(b.path)) };
+}
+if (require.main === module) {
+  try {
+    const { findings, inventory } = auditSource(root, { tracked: process.argv.includes('--tracked') });
+    if (findings.length) { console.error(findings.join('\n')); process.exitCode = 1; }
+    else console.log(`PASS source allowlist: ${inventory.length} UTF-8 files; no detected binaries, links, private imports, local user paths or token material.`);
+    if (process.argv.includes('--inventory')) console.log(JSON.stringify(inventory, null, 2));
+  } catch {
+    console.error('Source audit could not complete; publication is blocked.');
+    process.exitCode = 1;
   }
 }
-walk();
-// Before publishing, also check the actual Git index, including ignored paths.
-if (process.argv.includes('--tracked')) {
-  const { execFileSync } = require('node:child_process');
-  const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', windowsHide: true }).split('\0').filter(Boolean);
-  for (const name of tracked) if (!allowed.has(name)) findings.push(`Tracked path outside source allowlist: ${name}`);
-  for (const name of allowed) if (!tracked.includes(name)) findings.push(`Required source not tracked: ${name}`);
-}
-for (const name of allowed) if (name !== 'package-lock.json' && !inventory.some(item => item.path === name)) findings.push(`Required source missing: ${name}`);
-if (findings.length) { console.error(findings.join('\n')); process.exitCode = 1; }
-else console.log(`PASS source allowlist: ${inventory.length} UTF-8 files, no bundled binaries, symlinks, local user paths or detected token material.`);
-if (process.argv.includes('--inventory')) console.log(JSON.stringify(inventory.sort((a, b) => a.path.localeCompare(b.path)), null, 2));
+module.exports = { auditBytes, auditSource };

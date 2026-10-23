@@ -1,0 +1,717 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/frostynight-furry/furryup-live-connect/blob/main/schemas/live-event.v1.schema.json",
+  "title": "FurryUP LiveConnect normalized event v1",
+  "description": "Normalized output, not collector input. Optional additions are allowed. Validate semantic routing, protocol provenance and sensitive-data handling separately.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "event_id",
+    "source_msg_id",
+    "platform",
+    "room_id",
+    "event_type",
+    "source",
+    "preview",
+    "user_id",
+    "user_name",
+    "content",
+    "emotes",
+    "gift_id",
+    "gift_name",
+    "gift_count",
+    "count",
+    "count_mode",
+    "value",
+    "timestamp",
+    "received_at"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^(live|preview):(bilibili|douyin|kuaishou|wechat):"
+    },
+    "source_msg_id": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "platform": {
+      "enum": [
+        "bilibili",
+        "douyin",
+        "kuaishou",
+        "wechat"
+      ]
+    },
+    "room_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "event_type": {
+      "enum": [
+        "comment",
+        "gift",
+        "like",
+        "enter",
+        "follow",
+        "share",
+        "notice",
+        "super_chat",
+        "super_chat_delete",
+        "room_stats",
+        "live_status",
+        "entry_effect",
+        "viewer_snapshot",
+        "pk_status"
+      ]
+    },
+    "source": {
+      "enum": [
+        "simulation",
+        "bilibili-online-rank-api",
+        "wechat-backstage",
+        "ordinaryroad"
+      ]
+    },
+    "preview": {
+      "type": "boolean"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "user_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "user_name": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "user_identity_hidden": {
+      "const": true
+    },
+    "content": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "avatar_url": {
+      "type": "string",
+      "pattern": "^https://"
+    },
+    "avatar_id": {
+      "type": "string"
+    },
+    "emotes": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "required": [
+          "token",
+          "url",
+          "id"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https://"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "gift_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "gift_name": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "gift_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "count_mode": {
+      "enum": [
+        "delta",
+        "snapshot",
+        "signal"
+      ]
+    },
+    "value": {
+      "type": "null"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8640000000000000
+    },
+    "received_at": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8640000000000000
+    },
+    "watching_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "watched_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "liked_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "live_status": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "badge_name": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "badge_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "gift_price_raw": {
+      "type": "string",
+      "pattern": "^\\d{1,18}(?:\\.\\d{1,8})?$"
+    },
+    "super_chat_price_raw": {
+      "type": "string",
+      "pattern": "^\\d{1,18}(?:\\.\\d{1,8})?$"
+    },
+    "gift_price_unit": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "super_chat_price_unit": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "gift_coin_type": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "gift_unit": {
+      "type": "string",
+      "maxLength": 16
+    },
+    "receive_user_name": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "receive_user_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "combo_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "gift_image_url": {
+      "type": "string",
+      "pattern": "^https://"
+    },
+    "gift_image_id": {
+      "type": "string"
+    },
+    "gift_kind": {
+      "const": "membership"
+    },
+    "membership_action": {
+      "enum": [
+        "purchase",
+        "renew"
+      ]
+    },
+    "super_chat_id": {
+      "type": "string",
+      "pattern": "^[1-9]\\d{0,19}$"
+    },
+    "super_chat_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[1-9]\\d{0,19}$"
+      }
+    },
+    "super_chat_duration": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400
+    },
+    "viewer_snapshot": {
+      "$ref": "#/definitions/viewerSnapshot"
+    },
+    "pk": {
+      "$ref": "#/definitions/pk"
+    }
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "room_stats",
+              "viewer_snapshot",
+              "pk_status"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "count": {
+            "const": 0
+          },
+          "count_mode": {
+            "const": "snapshot"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "count": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "gift"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "gift_count": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "count_mode": {
+            "const": "delta"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "gift_count": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "platform": {
+            "const": "wechat"
+          },
+          "event_type": {
+            "const": "like"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "count_mode": {
+            "const": "signal"
+          }
+        }
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "event_type": {
+              "not": {
+                "enum": [
+                  "room_stats",
+                  "viewer_snapshot",
+                  "pk_status"
+                ]
+              }
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "count_mode": {
+              "const": "delta"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "preview": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "const": "simulation"
+          },
+          "event_id": {
+            "pattern": "^preview:",
+            "type": "string"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source": {
+            "not": {
+              "const": "simulation"
+            }
+          },
+          "event_id": {
+            "pattern": "^live:",
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "room_stats"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "required": [
+              "watching_count"
+            ],
+            "properties": {
+              "watching_count": {}
+            }
+          },
+          {
+            "required": [
+              "watched_count"
+            ],
+            "properties": {
+              "watched_count": {}
+            }
+          },
+          {
+            "required": [
+              "liked_count"
+            ],
+            "properties": {
+              "liked_count": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "super_chat_delete"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "super_chat_ids"
+        ],
+        "properties": {
+          "platform": {
+            "const": "bilibili"
+          },
+          "super_chat_ids": {}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "live_status"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "live_status"
+        ],
+        "properties": {
+          "live_status": {}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "viewer_snapshot"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "viewer_snapshot"
+        ],
+        "properties": {
+          "viewer_snapshot": {}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "pk_status"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "pk"
+        ],
+        "properties": {
+          "pk": {}
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "viewerSnapshot": {
+      "type": "object",
+      "required": [
+        "source",
+        "presenceEvidence",
+        "complete",
+        "viewers"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "presenceEvidence": {
+          "enum": [
+            "online-list",
+            "unknown"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "viewers": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "required": [
+              "userName"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "maxLength": 128
+              },
+              "userName": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "userLevel": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "wealthLevel": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500
+              },
+              "online": {
+                "type": "boolean"
+              },
+              "highWealth": {
+                "type": "boolean"
+              },
+              "avatarUrl": {
+                "type": "string",
+                "pattern": "^https://"
+              },
+              "avatarId": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "pk": {
+      "type": "object",
+      "required": [
+        "battleId",
+        "phase",
+        "protocol",
+        "observedAt"
+      ],
+      "properties": {
+        "battleId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase": {
+          "enum": [
+            "preparing",
+            "active",
+            "ended"
+          ]
+        },
+        "protocol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640000000000000
+        },
+        "sourceTimestamp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640000000000000
+        },
+        "startedAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640000000000000
+        },
+        "endsAt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640000000000000
+        },
+        "reason": {
+          "type": "string"
+        },
+        "sourceTime": {
+          "type": "string",
+          "pattern": "^\\d{1,20}$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^\\d{1,20}$"
+        },
+        "scoreUnit": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "participants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "side"
+            ],
+            "properties": {
+              "side": {
+                "enum": [
+                  "init",
+                  "match",
+                  "opponent",
+                  "participant"
+                ]
+              },
+              "roomId": {
+                "type": "string",
+                "pattern": "^(0|[1-9]\\d{0,19})$"
+              },
+              "userId": {
+                "type": "string",
+                "pattern": "^(0|[1-9]\\d{0,19})$"
+              },
+              "userName": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "avatarUrl": {
+                "type": "string",
+                "pattern": "^https://"
+              },
+              "avatarId": {
+                "type": "string"
+              },
+              "score": {
+                "type": "string",
+                "pattern": "^(0|[1-9]\\d{0,19})$"
+              },
+              "scoreDisplay": {
+                "type": "string",
+                "maxLength": 64
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

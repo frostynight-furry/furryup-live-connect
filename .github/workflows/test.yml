@@ -52,8 +52,10 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: collector/pom.xml
+      - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm test
       - run: npm run demo
+      - run: npm run replay
       - run: npm run demo:profiles
       - run: node scripts/audit-source.cjs --tracked
