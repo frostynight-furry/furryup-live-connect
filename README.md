@@ -8,6 +8,11 @@
 
 Four-platform livestream events, a versioned contract and offline replay tools, plus independent five-platform profile/follower adapters. MIT licensed; platform-specific limits apply.
 
+由[夜霜（FrostyNight）](https://github.com/frostynight-furry)发起并维护，源自 FurryUP Studio 的直播接入能力，面向希望自行开发和集成的开发者。
+
+- **主播直接使用完整产品：** [了解 FurryUP Studio](https://frostynight.top/furryup) · [下载与版本说明](https://github.com/frostynight-furry/furryup-studio-releases)。
+- **开发者集成组件：** [先跑一个离线示例](#先跑一个离线示例) · [API 文档](docs/API.md)。组件可以独立使用。
+
 [FurryUP 官网](https://frostynight.top/furryup) · [FurryUP Studio 下载](https://github.com/frostynight-furry/furryup-studio-releases) · [FurryUP 桌宠](https://github.com/frostynight-furry/furryup-desktop-pet-releases) · [参与贡献](CONTRIBUTING.md)
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
@@ -220,6 +225,12 @@ const unsubscribeAvatars = live.subscribeAvatars(update => {
 
 当前依赖固定为 OrdinaryRoad `1.5.8`。运行时不会自动下载并替换采集代码。升级请修改 `collector/pom.xml` 的 `ordinaryroad.version`，重新构建并完成离线测试，再在获授权的直播间验证。GitHub Actions 仅执行离线回归，不会自动升级依赖、连接直播间或发布安装包。
 
+## 关于夜霜与 FurryUP Studio
+
+[夜霜（FrostyNight）](https://github.com/frostynight-furry)是 FurryUP 项目的发起者与维护者，开发面向主播的 FurryUP Studio，并将可独立复用的通用组件开源。项目同时复用社区成果，第三方贡献及许可记录保留在各自说明中。
+
+FurryUP Studio 将直播工作台、互动与 OBS 配合等工作流集中到桌面界面，并提供安装和更新入口。希望直接使用完整产品的主播可以查看[官网](https://frostynight.top/furryup)及[下载与版本说明](https://github.com/frostynight-furry/furryup-studio-releases)；具体可用能力以下载版本的说明为准。LiveConnect 提供独立接入机制，使用它不需要安装 FurryUP Studio 或注册 FurryUP 账号。
+
 ## 许可证与 FurryUP
 
 本仓库自有源码采用 [MIT 许可证](LICENSE)，允许按其条款使用、修改、分发和商用；请保留版权与许可声明。第三方来源和原有许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 及 [licenses/](licenses/)。软件许可不代表平台接口访问授权，也不授予 FurryUP 商标权。
@@ -233,6 +244,16 @@ const unsubscribeAvatars = live.subscribeAvatars(update => {
 [![FurryUP Studio 四平台工作台，使用示例消息](https://raw.githubusercontent.com/frostynight-furry/furryup-studio-releases/main/assets/screenshots/live-workbench.png)](https://github.com/frostynight-furry/furryup-studio-releases#界面预览)
 
 做出了自己的工具？欢迎按[案例提交说明](docs/SHOWCASE.md)提供公开项目链接。我们会区分官方产品和独立社区项目，不将未接入的项目标记为用户案例。
+
+## 自愿致谢
+
+如果 LiveConnect 帮助了你的项目，欢迎在 README、文档或“关于”页面注明来源。可以直接复制下面的 Markdown，或按实际使用情况调整：
+
+```markdown
+本项目使用 [FurryUP LiveConnect](https://github.com/frostynight-furry/furryup-live-connect)，由[夜霜（FrostyNight）](https://github.com/frostynight-furry)发起并维护。完整主播端产品：[FurryUP Studio](https://frostynight.top/furryup)。
+```
+
+上述致谢文字及链接均为自愿，不增加 [MIT 许可证](LICENSE)之外的使用条件。MIT 要求保留的版权与许可声明仍须保留，第三方许可也继续适用。注明来源不表示你的项目获得 FurryUP 官方合作或背书。
 
 ### Douyin cloud browser service / 抖音云端主页读取
 
