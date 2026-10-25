@@ -3,8 +3,9 @@
 [![CI](https://github.com/frostynight-furry/furryup-live-connect/actions/workflows/test.yml/badge.svg)](https://github.com/frostynight-furry/furryup-live-connect/actions/workflows/test.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.12-43853d.svg)](package.json)
+[![Release](https://img.shields.io/github/v/release/frostynight-furry/furryup-live-connect)](https://github.com/frostynight-furry/furryup-live-connect/releases/latest)
 
-**四平台直播事件接入与测试工具，配套五平台主页和粉丝数接口。** 用一致的事件格式接入 B站、抖音、快手和视频号，通过离线合成回放验证去重、乱序、切房和重连边界；主页模块另含小红书，小红书不包含直播采集。
+**面向开发者的多平台直播数据接入组件，持续以 MIT 许可证开源。** 用统一事件接口接入 B站、抖音、快手和视频号，支持消息中的观众头衔、头像与礼物元数据，并提供事件规范、合成回放及独立的五平台主页／粉丝数接口。可用于自己的弹幕工具、直播助手、桌宠或 OBS 组件；各平台支持范围见下方能力表。
 
 Four-platform livestream events, a versioned contract and offline replay tools, plus independent five-platform profile/follower adapters. MIT licensed; platform-specific limits apply.
 
@@ -17,7 +18,14 @@ Four-platform livestream events, a versioned contract and offline replay tools, 
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-版本 `0.7.2`。包含独立的[五平台主页与粉丝数模块](docs/PROFILES.md)，包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+当前版本 **[0.7.2](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.2)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
+
+| 能力 | 当前范围 |
+| --- | --- |
+| 四平台直播接入 | B站、抖音、快手、视频号；统一订阅、消息去重与有界头像缓存，事件覆盖按平台区分 |
+| 观众多头衔 | 随当前消息传递 `user_badges`，包含有明确来源的角色、粉丝牌、等级及守护等标记 |
+| 事件规范与回放 | schemaVersion 1、JSON Schema、四平台合成示例，以及重复／乱序、切房和重连回归 |
+| 主页与粉丝数 | 独立模块另含小红书；按平台使用实验公开接口、可选授权、浏览器读取或手动模式，小红书无直播采集 |
 
 0.7.2 汇总四平台随消息传递的 `user_badges` 多头衔、抖音管理员与等级去重、明确星守护标记，以及快手金粉／钻粉年费等徽章适配。字段缺失时不猜测身份，旧粉丝牌字段保持兼容；头衔仅供显示，不授予权限。详见[更新记录](CHANGELOG.md)与[字段规范](docs/EVENTS.md)，离线验证不代表四平台长时实播已通过。
 
@@ -38,7 +46,7 @@ npm run test:events
 
 三个回放场景分别验证四平台重复/乱序、切房迟到事件和重连生命周期。每份报告明确标记 synthetic=true；回放无需登录、联网、Java 或 Electron，所有数据独立合成。事件格式仍是 schemaVersion=1，去重有时间/容量/会话边界，不承诺跨重启永久“恰好一次”。当前新增功能的中英文文档同步维护，字段名与数据规范共用一份。
 
-源码公开范围仅含独立接入组件、规范、测试及示例；本轮不包含主播端私有模块、用户数据、抠图或模型资源。测试通过不代表真实平台或账号全部可用。
+开源范围保持为独立采集与协议适配、通用事件处理、规范、合成测试及示例。完整 FurryUP Studio、自制礼物特效、官方业务规则、专属素材、模型和用户数据不属于本仓库的开源内容。第三方组件遵循各自许可证与声明。测试通过不代表真实平台或账号全部可用。
 
 ## 先跑一个离线示例
 

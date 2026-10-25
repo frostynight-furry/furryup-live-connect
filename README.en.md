@@ -2,9 +2,18 @@
 
 [中文](README.md) · [API reference (中文)](docs/API.md) · [Troubleshooting (中文)](docs/TROUBLESHOOTING.md) · [Roadmap (中文)](docs/ROADMAP.md)
 
-Open-source **four-platform livestream events, a versioned contract and offline replay tools**, plus independent five-platform profile/follower adapters. Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API; test duplicate/out-of-order messages, room switches and reconnect boundaries. Profiles additionally support Xiaohongshu, which has no live collector.
+[![Release](https://img.shields.io/github/v/release/frostynight-furry/furryup-live-connect)](https://github.com/frostynight-furry/furryup-live-connect/releases/latest)
 
-Version **0.7.2** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required.
+**A developer component for multi-platform livestream data, continuing as MIT open source.** Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API, with message-local sender badges, avatars and gift metadata. Includes a versioned event contract, synthetic replay tools and independent profile/follower adapters. Integrate it into your own chat tools, live assistants, desktop pets or OBS components; capabilities vary by platform.
+
+Version **[0.7.2](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.2)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
+
+| Capability | Current scope |
+| --- | --- |
+| Four live platforms | Bilibili, Douyin, Kuaishou and WeChat Channels; shared subscriptions, deduplication and bounded avatar caching; supported events vary |
+| Multiple sender badges | Message-local `user_badges` with explicitly sourced roles, fans medals, levels and membership labels |
+| Event contract and replay | schemaVersion 1, JSON Schema, synthetic examples and duplicate/out-of-order, room-switch and reconnect regressions |
+| Profiles and followers | Separate module also recognizes Xiaohongshu; experimental public APIs, optional OAuth, browser reading or manual mode vary by platform; no Xiaohongshu live collector |
 
 0.7.2 brings message-local `user_badges` across the four live platforms, Douyin administrator/level deduplication and explicit star-guardian recognition, and Kuaishou gold/annual diamond fans and other explicit badges. Missing fields do not imply identities; legacy fans-medal fields remain compatible. Badges are display metadata, never permissions. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish long-running live-platform acceptance.
 
@@ -28,7 +37,7 @@ npm run test:events
 
 Three replay scenarios cover concurrent four-platform duplicates/out-of-order arrivals, late old-room events and reconnect lifecycle boundaries. Reports are explicitly synthetic=true. No account, network, Java or Electron is needed for replay; every fixture is authored synthetic data. Event schemaVersion remains 1. Deduplication has time/capacity/session bounds, not durable exactly-once semantics.
 
-Chinese and English documentation for these additions share the same field names, Schema, implementation and fixtures. No private broadcaster module, user data, cutout or model resource is included. Offline tests do not certify every real platform or account.
+Chinese and English documentation share the same field names, Schema, implementation and fixtures. Open-source scope remains the standalone collectors, protocol adapters, generic event processing, contracts, synthetic tests and examples. The complete FurryUP Studio application, custom gift effects, official business rules, exclusive assets, models and user data are outside this repository's open-source scope. Third-party components retain their own licenses and notices. Offline tests do not certify every real platform or account.
 
 ## Try the offline demo
 
