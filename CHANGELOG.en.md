@@ -1,3 +1,7 @@
+## 0.7.1 — local candidate
+
+Normalize Douyin administrator and level badge image descriptions into semantic badges, avoid duplicate honor/fans levels, and prefer an available fans club name. Synthetic regressions cover the reported shape without identity inference or permission changes.
+
 ## 0.7.0 — local candidate
 
 Message-local user_badges for multiple platform titles and levels. Uses existing OrdinaryRoad 1.5.8 models and official WeChat badgeInfos enums. Unknown labels remain absent; no permissions, image assets or identity cache are introduced. Real live delivery remains unverified.

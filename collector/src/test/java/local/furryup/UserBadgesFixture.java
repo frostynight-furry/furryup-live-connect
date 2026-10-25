@@ -37,6 +37,26 @@ public final class UserBadgesFixture {
       .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setName("合成守护"))).build();
     var d = event("douyin", new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(user).setContent("合成弹幕").build()));
     expect(d,"fans","合成粉丝团",14); expect(d,"wealth","荣誉",38); expect(d,"title","合成守护",0);
+    var screenshotUser = User.newBuilder().setId(456).setNickName("合成房管")
+      .setPayGrade(PayGrade.newBuilder().setLevel(20))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setAlternativeText("房管勋章")))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setAlternativeText("荣誉等级20级勋章").setLevel(20)))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setAlternativeText("粉丝团等级11级勋章").setLevel(11)));
+    var fixed = event("douyin", new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(screenshotUser).setContent("合成弹幕").build()));
+    expect(fixed,"role","管理员",0); expect(fixed,"wealth","荣誉",20); expect(fixed,"fans","粉丝团",11);
+    if (fixed.path("user_badges").size()!=3) throw new AssertionError("Image descriptions duplicated badges: "+fixed);
+    var screenshotFixed = fixed.deepCopy();
+    screenshotUser.setFansClub(FansClub.newBuilder().setData(FansClubData.newBuilder().setClubName("合成团名").setLevel(11)))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setName("管理员徽章").setLevel(1)));
+    fixed = event("douyin", new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(screenshotUser).setContent("合成弹幕").build()));
+    expect(fixed,"fans","合成团名",11);
+    if (fixed.path("user_badges").size()!=3) throw new AssertionError("Prefer structured fans and deduplicate role");
+    var fallbackUser=User.newBuilder().addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setName("荣誉等级").setLevel(20)))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setAlternativeText("粉丝团等级99999级勋章")))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setName("房管爱好者")));
+    fixed=event("douyin",new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(fallbackUser).setContent("合成弹幕").build()));
+    expect(fixed,"wealth","荣誉",20); expect(fixed,"title","房管爱好者",0);
+    if(fixed.path("user_badges").size()!=2) throw new AssertionError("Unknown title or invalid level misclassified");
     var state = LiveAudienceState.newBuilder().setAssistantTypeValue(1).setWealthGrade(38)
       .setLiveFansGroupState(LiveFansGroupState.newBuilder().setIntimacyLevel(300));
     state.addLiveAudienceState11(LiveAudienceState.LiveAudienceState_11.newBuilder().setLiveAudienceState111(
@@ -50,6 +70,6 @@ public final class UserBadgesFixture {
     if (k.path("user_badges").size() != 4) throw new AssertionError("Duplicate or extra badge");
     var empty = event("kuaishou", new KuaishouDanmuMsg(WebCommentFeed.newBuilder().setContent("plain").build()));
     if (empty.has("user_badges")) throw new AssertionError("No badges must remain absent");
-    if (args.length > 0 && args[0].equals("--emit-events")) for(var e : new ObjectNode[]{b,d,k}) System.out.println(e);
+    if (args.length > 0 && args[0].equals("--emit-events")) for(var e : new ObjectNode[]{b,d,k,screenshotFixed}) System.out.println(e);
   }
 }

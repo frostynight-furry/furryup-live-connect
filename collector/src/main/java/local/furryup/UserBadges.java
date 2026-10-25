@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tech.ordinaryroad.live.chat.client.codec.bilibili.msg.DanmuMsgMsg;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /** Message-local display metadata only; never grants permissions or caches identities. */
 final class UserBadges {
@@ -27,6 +28,22 @@ final class UserBadges {
   }
   private static void level(ArrayNode out, String kind, String label, Object value) {
     long n = number(value); if (n > 0 && n <= 1000) add(out, kind, label, n);
+  }
+  private static boolean hasKind(ArrayNode out, String kind) {
+    for (JsonNode badge : out) if (kind.equals(badge.path("kind").asText())) return true;
+    return false;
+  }
+  private static boolean douyinSemanticBadge(ArrayNode out, String label, long contentLevel) {
+    // Image alternative text describes existing semantic badges, not extra titles.
+    if (label.matches("(?:房管|管理员)(?:勋章|徽章)?")) {
+      add(out, "role", "管理员", 0); return true;
+    }
+    var match = Pattern.compile("^(荣誉|荣耀|粉丝团)等级(?:([0-9]{1,9})级)?(?:勋章|徽章)?$").matcher(label);
+    if (!match.matches()) return false;
+    String kind = match.group(1).equals("粉丝团") ? "fans" : "wealth";
+    long n = match.group(2) == null ? contentLevel : Long.parseLong(match.group(2));
+    if (!hasKind(out, kind)) level(out, kind, kind.equals("fans") ? "粉丝团" : "荣誉", n);
+    return true;
   }
   static ArrayNode extract(String platform, Object message, ObjectNode event) {
     ArrayNode out = JSON.createArrayNode();
@@ -59,6 +76,8 @@ final class UserBadges {
           Object content = get(item, "getContent");
           String label = text(get(content, "getAlternativeText"));
           if (label.isBlank()) label = text(get(content, "getName"));
+          label = label.trim();
+          if (douyinSemanticBadge(out, label, number(get(content, "getLevel")))) continue;
           // Only explicit accessible labels: image URLs and internal IDs are not titles.
           add(out, "title", label, number(get(content, "getLevel")));
         }
