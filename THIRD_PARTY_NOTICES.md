@@ -28,6 +28,8 @@ The video-account message decoder uses message type descriptions from [fire4nt/w
 
 ## Kuaishou profile adapter
 
+The badge adapter continues to use OrdinaryRoad 1.5.8 (MIT) and protobuf unknown-field preservation. Newer field numbers and segment identifiers were cross-checked against the official Kuaishou Live desktop client 5.168.2.4118: audience state segments 11/15, segment icon 1/name 3, icon path 2/text 4. This bounded protocol adapter is independently written; official implementation code, graphics, live messages and account data are not redistributed. Synthetic fixtures contain invented audience and club names. Unknown icon meanings remain unsupported.
+
 The profile-avatar adapter is an original implementation of Kuaishou's HTTPS endpoint at `live.kuaishou.com/live_api/baseuser/userinfo/byid`. It validates the returned user ID and image host, respects hidden identities, and bounds requests, caching and retries. It does not redistribute Kuaishou web application code or third-party scraper implementations. The endpoint is not a guaranteed public developer API.
 
 Newer message endpoints and notice/live-status shapes were also checked against the official video-account assistant JavaScript build `26092402`, module `44704` / `updateAppList`: [official reference asset](https://res.wx.qq.com/t/wx_fed/finder/helper/live/finder-helper-live/res/static/js/async/969.9949886a.js). The upstream web application source and assets are not redistributed.

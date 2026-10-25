@@ -1,5 +1,7 @@
 ## 0.7.1 — local candidate
 
+Read preserved Kuaishou author-view protobuf segments, keep club name and level together, and recognize verified gold fans, annual diamond fans, guardian, honored guest, core audience and rank identifiers. No color/wealth-based identity inference or platform image redistribution.
+
 Normalize Douyin administrator and level badge image descriptions into semantic badges, avoid duplicate honor/fans levels, and prefer an available fans club name. Synthetic regressions cover the reported shape without identity inference or permission changes.
 
 ## 0.7.0 — local candidate

@@ -2,6 +2,8 @@ package local.furryup;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnknownFieldSet;
 import tech.ordinaryroad.live.chat.client.codec.bilibili.msg.DanmuMsgMsg;
 import tech.ordinaryroad.live.chat.client.codec.douyin.msg.DouyinDanmuMsg;
 import tech.ordinaryroad.live.chat.client.codec.douyin.protobuf.*;
@@ -24,6 +26,29 @@ public final class UserBadgesFixture {
     for (var badge : e.path("user_badges")) if (badge.path("kind").asText().equals(kind)
         && badge.path("label").asText().equals(label) && badge.path("level").asInt() == level) return;
     throw new AssertionError("Missing " + kind + "/" + label + "/" + level + " in " + e);
+  }
+  private static UnknownFieldSet.Field wire(ByteString... values) {
+    var field = UnknownFieldSet.Field.newBuilder();
+    for (var value : values) field.addLengthDelimited(value);
+    return field.build();
+  }
+  private static ByteString segment(String type, String path, String label) {
+    var icon = UnknownFieldSet.newBuilder()
+      .addField(1, wire(ByteString.copyFromUtf8("123456")))
+      .addField(2, wire(ByteString.copyFromUtf8(path)))
+      .addField(4, wire(ByteString.copyFromUtf8(label))).build();
+    return UnknownFieldSet.newBuilder().addField(1, wire(icon.toByteString()))
+      .addField(3, wire(ByteString.copyFromUtf8(type))).build().toByteString();
+  }
+  private static ObjectNode modern(int field, int level, ByteString... segments) throws Exception {
+    var state = LiveAudienceState.newBuilder().setAssistantTypeValue(1).setWealthGrade(28)
+      .setLiveFansGroupState(LiveFansGroupState.newBuilder().setIntimacyLevel(level)).build();
+    // Parse the complete wire through the actual old SDK to prove unknown fields survive.
+    var wireState = UnknownFieldSet.newBuilder(UnknownFieldSet.parseFrom(state.toByteArray()))
+      .addField(field, wire(segments)).build();
+    return event("kuaishou", new KuaishouDanmuMsg(WebCommentFeed.newBuilder().setId("synthetic-modern-"+level)
+      .setUser(SimpleUserInfo.newBuilder().setPrincipalId("synthetic-user").setUserName("合成粉丝"+level))
+      .setSenderState(LiveAudienceState.parseFrom(wireState.toByteArray())).setContent("合成徽章验证").build()));
   }
   public static void main(String[] args) throws Exception {
     var bili = new DanmuMsgMsg();
@@ -68,8 +93,36 @@ public final class UserBadgesFixture {
       .setSenderState(state).setContent("合成弹幕").build()));
     expect(k,"role","超管",0); expect(k,"wealth","财富",38); expect(k,"fans","合成团",300); expect(k,"title","合成守护",0);
     if (k.path("user_badges").size() != 4) throw new AssertionError("Duplicate or extra badge");
+    var gold = modern(15, 6,
+      segment("fansGroup", "super_fans_vip_v_v2/super_fans_vip_6.9.png", "合成团"),
+      segment("liveRoomVipState", "super_guardian_level_label/zhong_ai.png", ""),
+      segment("honoredGuestState", "keyusers/key_user_honoured_guest.png", ""),
+      segment("primeAudience", "prime_audience.png", ""),
+      segment("audienceRank", "rank_top/rank_top_1.png", ""));
+    expect(gold,"fans","金粉团 · 合成团",6); expect(gold,"membership","钟爱守护",0);
+    expect(gold,"membership","贵宾",0); expect(gold,"title","核心观众",0); expect(gold,"title","榜1",0);
+    if(gold.path("user_badges").size()!=7) throw new AssertionError("Gold fan label split or missing title: "+gold);
+    var diamond = modern(11, 14, segment("fansGroup", "super_fans_svip_v_nian_zuan_v2/super_fans_svip_14.9.png", "合成团"));
+    expect(diamond,"fans","钻粉团 · 年费 · 合成团",14);
+    if(diamond.path("user_badges").size()!=3) throw new AssertionError("Diamond label split");
+    expect(modern(15,6,segment("fansGroup","super_fans_vip_v_nian_v2/super_fans_vip_6.9.png","合成团")),"fans","金粉团 · 年费 · 合成团",6);
+    expect(modern(15,14,segment("fansGroup","super_fans_svip_v_zuan_v2/super_fans_svip_14.9.png","合成团")),"fans","钻粉团 · 合成团",14);
+    var ordinary = modern(15,6,segment("fansGroup","fans_label_v2/fans_label_6.9.png","合成团"),
+      segment("liveRoomVipState","super_guardian_level_label/upcoming_zhong_ai.png",""),
+      segment("unknown","keyusers/key_user_honoured_guest.png",""),
+      ByteString.copyFrom(new byte[]{10,127}),segment("custom","unknown.png","合成称号"));
+    expect(ordinary,"fans","合成团",6); expect(ordinary,"title","合成称号",0);
+    if(ordinary.path("user_badges").size()!=4) throw new AssertionError("Unknown or upcoming icon granted identity");
+    var authorWins = LiveAudienceState.newBuilder().setFansGroupIntimacyLevel(6).build();
+    var both = UnknownFieldSet.newBuilder(UnknownFieldSet.parseFrom(authorWins.toByteArray()))
+      .addField(11,wire(segment("fansGroup","fans_label_v2/fans_label_6.9.png","旧团")))
+      .addField(15,wire(segment("fansGroup","super_fans_vip_v_v2/super_fans_vip_6.9.png","合成团"))).build();
+    var preferred=event("kuaishou",new KuaishouDanmuMsg(WebCommentFeed.newBuilder().setContent("synthetic")
+      .setSenderState(LiveAudienceState.parseFrom(both.toByteArray())).build()));
+    expect(preferred,"fans","金粉团 · 合成团",6);
+    if(preferred.path("user_badges").size()!=1) throw new AssertionError("Author and audience segments duplicated");
     var empty = event("kuaishou", new KuaishouDanmuMsg(WebCommentFeed.newBuilder().setContent("plain").build()));
     if (empty.has("user_badges")) throw new AssertionError("No badges must remain absent");
-    if (args.length > 0 && args[0].equals("--emit-events")) for(var e : new ObjectNode[]{b,d,k,screenshotFixed}) System.out.println(e);
+    if (args.length > 0 && args[0].equals("--emit-events")) for(var e : new ObjectNode[]{b,d,k,screenshotFixed,gold,diamond}) System.out.println(e);
   }
 }

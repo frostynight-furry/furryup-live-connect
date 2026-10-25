@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import tech.ordinaryroad.live.chat.client.codec.bilibili.msg.DanmuMsgMsg;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnknownFieldSet;
 
 /** Message-local display metadata only; never grants permissions or caches identities. */
 final class UserBadges {
@@ -44,6 +46,56 @@ final class UserBadges {
     long n = match.group(2) == null ? contentLevel : Long.parseLong(match.group(2));
     if (!hasKind(out, kind)) level(out, kind, kind.equals("fans") ? "粉丝团" : "荣誉", n);
     return true;
+  }
+  private static String wireText(UnknownFieldSet fields, int id) {
+    var values = fields.getField(id).getLengthDelimitedList();
+    if (values.isEmpty() || values.get(0).size() > 1024 || !values.get(0).isValidUtf8()) return "";
+    return values.get(0).toStringUtf8();
+  }
+  private static void kuaishouSegments(ArrayNode out, Object state, long intimacy) {
+    // OrdinaryRoad preserves newer protobuf fields. Decode only the documented
+    // state -> segment -> icon path, never arbitrary nested strings or images.
+    Object encoded = get(state, "toByteArray");
+    if (!(encoded instanceof byte[] bytes) || bytes.length > 262144) return;
+    try {
+      var fields = UnknownFieldSet.parseFrom(bytes);
+      var segments = fields.getField(15).getLengthDelimitedList(); // author view
+      if (segments.isEmpty()) segments = fields.getField(11).getLengthDelimitedList();
+      int count = 0;
+      for (ByteString segmentBytes : segments) {
+        if (++count > 64) break;
+        if (segmentBytes.size() > 16384) continue;
+        try {
+          var segment = UnknownFieldSet.parseFrom(segmentBytes);
+          String type = wireText(segment, 3);
+          var icons = segment.getField(1).getLengthDelimitedList();
+          if (icons.isEmpty()) continue;
+          var icon = UnknownFieldSet.parseFrom(icons.get(0));
+          String path = wireText(icon, 2), label = wireText(icon, 4).trim();
+          boolean fans = type.equals("fansGroup") || (type.isEmpty() && path.toLowerCase(Locale.ROOT).startsWith("fans"));
+          if (fans) {
+            String tier = "";
+            if (path.matches("super_fans_vip_v_v2/super_fans_vip_[0-9]{1,3}\\.9\\.png")) tier = "金粉团";
+            if (path.matches("super_fans_vip_v_nian_v2/super_fans_vip_[0-9]{1,3}\\.9\\.png")) tier = "金粉团 · 年费";
+            if (path.matches("super_fans_svip_v_zuan_v2/super_fans_svip_[0-9]{1,3}\\.9\\.png")) tier = "钻粉团";
+            if (path.matches("super_fans_svip_v_nian_zuan_v2/super_fans_svip_[0-9]{1,3}\\.9\\.png")) tier = "钻粉团 · 年费";
+            if (!tier.isEmpty()) label = label.isEmpty() ? tier : tier + " · " + label;
+            if (label.isEmpty()) label = "粉丝团";
+            if (!hasKind(out, "fans")) add(out, "fans", label, intimacy);
+          } else if (type.equals("liveRoomVipState") && path.equals("super_guardian_level_label/zhong_ai.png")) {
+            add(out, "membership", "钟爱守护", 0);
+          } else if (type.equals("honoredGuestState") && path.equals("keyusers/key_user_honoured_guest.png")) {
+            add(out, "membership", "贵宾", 0);
+          } else if (type.equals("primeAudience") && path.equals("prime_audience.png")) {
+            add(out, "title", "核心观众", 0);
+          } else if (type.equals("audienceRank") && path.matches("rank_top/rank_top_(?:[1-9]|10)\\.png")) {
+            add(out, "title", "榜" + path.substring("rank_top/rank_top_".length(), path.length() - 4), 0);
+          } else if (!type.equals("assistantState") && !type.equals("wealthGrade")) {
+            add(out, "title", label, 0);
+          }
+        } catch (java.io.IOException ignored) { /* A malformed optional badge cannot hide siblings. */ }
+      }
+    } catch (java.io.IOException ignored) { /* Preserve the ordinary typed state fields. */ }
   }
   static ArrayNode extract(String platform, Object message, ObjectNode event) {
     ArrayNode out = JSON.createArrayNode();
@@ -90,16 +142,8 @@ final class UserBadges {
         level(out, "wealth", "财富", get(state, "getWealthGrade"));
         long intimacy = number(get(get(state, "getLiveFansGroupState"), "getIntimacyLevel"));
         if (intimacy == 0) intimacy = number(get(state, "getFansGroupIntimacyLevel"));
-        Object badges = get(state, "getLiveAudienceState11List");
-        boolean hasFans = false;
-        if (badges instanceof Iterable<?> items) for (Object item : items) {
-          Object badge = get(item, "getLiveAudienceState111");
-          String label = text(get(badge, "getBadgeName"));
-          boolean fans = text(get(badge, "getBadgeIcon")).toLowerCase(Locale.ROOT).startsWith("fans");
-          add(out, fans ? "fans" : "title", label, fans ? intimacy : 0);
-          if (fans && !label.isBlank()) hasFans = true;
-        }
-        if (!hasFans) level(out, "fans", "粉丝团", intimacy);
+        kuaishouSegments(out, state, intimacy);
+        if (!hasKind(out, "fans")) level(out, "fans", "粉丝团", intimacy);
         add(out, "title", text(get(get(state, "getNameplate"), "getName")), 0);
       }
     } catch (RuntimeException ignored) { /* Optional metadata cannot drop a message. */ }
