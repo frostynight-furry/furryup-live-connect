@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tech.ordinaryroad.live.chat.client.codec.bilibili.msg.DanmuMsgMsg;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnknownFieldSet;
@@ -35,11 +36,23 @@ final class UserBadges {
     for (JsonNode badge : out) if (kind.equals(badge.path("kind").asText())) return true;
     return false;
   }
-  private static boolean douyinSemanticBadge(ArrayNode out, String label, long contentLevel) {
+  private static boolean douyinStarGuardian(Object fans, long level) {
+    // The active fans badge carries an explicit star-guardian asset in slot 4.
+    // A club name, membership level or the ordinary slot-2 icon is insufficient.
+    if (number(get(fans, "getUserFansClubStatus")) != 1 || level < 1 || level > 1000) return false;
+    Object icons = get(get(fans, "getBadge"), "getIconsMap");
+    if (!(icons instanceof Map<?, ?> map)) return false;
+    Object image = map.get(4);
+    String expected = "webcast/star_guard_advanced_badge_" + level + "_xmp.png";
+    return expected.equals(text(get(image, "getUri")));
+  }
+  private static boolean douyinSemanticBadge(ArrayNode out, String label, long contentLevel, String clubName) {
     // Image alternative text describes existing semantic badges, not extra titles.
     if (label.matches("(?:房管|管理员)(?:勋章|徽章)?")) {
       add(out, "role", "管理员", 0); return true;
     }
+    // A named fans badge's alternative text is still a description, not a title.
+    if (!clubName.isBlank() && label.startsWith(clubName + "粉丝团等级")) label = label.substring(clubName.length());
     var match = Pattern.compile("^(荣誉|荣耀|粉丝团)等级(?:([0-9]{1,9})级)?(?:勋章|徽章)?$").matcher(label);
     if (!match.matches()) return false;
     String kind = match.group(1).equals("粉丝团") ? "fans" : "wealth";
@@ -120,7 +133,9 @@ final class UserBadges {
       } else if (platform.equals("douyin")) {
         Object user = get(get(message, "getMsg"), "getUser");
         Object fans = get(get(user, "getFansClub"), "getData");
-        add(out, "fans", text(get(fans, "getClubName")), number(get(fans, "getLevel")));
+        String clubName = text(get(fans, "getClubName"));
+        long fansLevel = number(get(fans, "getLevel"));
+        add(out, "fans", douyinStarGuardian(fans, fansLevel) ? (clubName.isBlank() ? "星守护" : "星守护 · " + clubName) : clubName, fansLevel);
         level(out, "wealth", "荣誉", get(get(user, "getPayGrade"), "getLevel"));
         level(out, "level", "等级", get(user, "getLevel"));
         Object badges = get(user, "getBadgeImageListList");
@@ -129,7 +144,7 @@ final class UserBadges {
           String label = text(get(content, "getAlternativeText"));
           if (label.isBlank()) label = text(get(content, "getName"));
           label = label.trim();
-          if (douyinSemanticBadge(out, label, number(get(content, "getLevel")))) continue;
+          if (douyinSemanticBadge(out, label, number(get(content, "getLevel")), clubName.isBlank() ? text(get(content, "getName")) : clubName)) continue;
           // Only explicit accessible labels: image URLs and internal IDs are not titles.
           add(out, "title", label, number(get(content, "getLevel")));
         }

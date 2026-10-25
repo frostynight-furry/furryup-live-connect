@@ -71,6 +71,20 @@ public final class UserBadgesFixture {
     expect(fixed,"role","管理员",0); expect(fixed,"wealth","荣誉",20); expect(fixed,"fans","粉丝团",11);
     if (fixed.path("user_badges").size()!=3) throw new AssertionError("Image descriptions duplicated badges: "+fixed);
     var screenshotFixed = fixed.deepCopy();
+    var guardianFans = FansClubData.newBuilder().setClubName("合成团名").setLevel(11).setUserFansClubStatus(1)
+      .setBadge(UserBadge.newBuilder().putIcons(2,Image.newBuilder().setUri("webcast/fansclub_level_v6_11.png").build())
+        .putIcons(4,Image.newBuilder().setUri("webcast/star_guard_advanced_badge_11_xmp.png").build()));
+    screenshotUser.setFansClub(FansClub.newBuilder().setData(guardianFans))
+      .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setName("合成团名").setAlternativeText("合成团名粉丝团等级11级勋章").setLevel(11)));
+    var guardianFixed = event("douyin",new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(screenshotUser).setContent("合成星守护弹幕").build()));
+    expect(guardianFixed,"fans","星守护 · 合成团名",11);
+    if(guardianFixed.path("user_badges").size()!=3) throw new AssertionError("Star guardian duplicated fans description: "+guardianFixed);
+    for(var inactive : new FansClubData[]{guardianFans.clone().setUserFansClubStatus(0).build(),guardianFans.clone().setBadge(UserBadge.newBuilder().putIcons(2,Image.newBuilder().setUri("webcast/star_guard_advanced_badge_11_xmp.png").build())).build(),guardianFans.clone().setBadge(UserBadge.newBuilder().putIcons(4,Image.newBuilder().setUri("webcast/star_guard_advanced_badge_12_xmp.png").build())).build(),guardianFans.clone().setBadge(UserBadge.newBuilder().putIcons(4,Image.newBuilder().setUri("other/star_guard_advanced_badge_11_xmp.png").build())).build()}){
+      var ordinaryUser=screenshotUser.clone().setFansClub(FansClub.newBuilder().setData(inactive));
+      var noGuardian=event("douyin",new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(ordinaryUser).setContent("合成普通粉丝").build()));
+      expect(noGuardian,"fans","合成团名",11);if(noGuardian.path("user_badges").size()!=3)throw new AssertionError("Inactive or unknown guardian metadata inferred identity");
+    }
+    screenshotUser.removeBadgeImageList(screenshotUser.getBadgeImageListCount()-1);
     screenshotUser.setFansClub(FansClub.newBuilder().setData(FansClubData.newBuilder().setClubName("合成团名").setLevel(11)))
       .addBadgeImageList(Image.newBuilder().setContent(ImageContent.newBuilder().setName("管理员徽章").setLevel(1)));
     fixed = event("douyin", new DouyinDanmuMsg(ChatMessage.newBuilder().setUser(screenshotUser).setContent("合成弹幕").build()));
@@ -123,6 +137,6 @@ public final class UserBadgesFixture {
     if(preferred.path("user_badges").size()!=1) throw new AssertionError("Author and audience segments duplicated");
     var empty = event("kuaishou", new KuaishouDanmuMsg(WebCommentFeed.newBuilder().setContent("plain").build()));
     if (empty.has("user_badges")) throw new AssertionError("No badges must remain absent");
-    if (args.length > 0 && args[0].equals("--emit-events")) for(var e : new ObjectNode[]{b,d,k,screenshotFixed,gold,diamond}) System.out.println(e);
+    if (args.length > 0 && args[0].equals("--emit-events")) for(var e : new ObjectNode[]{b,d,k,screenshotFixed,gold,diamond,guardianFixed}) System.out.println(e);
   }
 }

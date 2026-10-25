@@ -1,3 +1,7 @@
+## 0.7.2 — local candidate
+
+Recognize the explicit star-guardian resource on active Douyin fans badges and retain the club name and level in one badge. Named badge accessibility descriptions no longer create duplicate titles. Unknown assets, inactive status and mismatched levels cannot promote ordinary fans. Regression fixtures are synthetic; no platform images or private messages are included.
+
 ## 0.7.1 — local candidate
 
 Read preserved Kuaishou author-view protobuf segments, keep club name and level together, and recognize verified gold fans, annual diamond fans, guardian, honored guest, core audience and rank identifiers. No color/wealth-based identity inference or platform image redistribution.
