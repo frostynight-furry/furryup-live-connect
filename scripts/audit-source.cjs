@@ -4,7 +4,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
-  'schemas/live-event.v1.schema.json', 'testing/index.cjs', 'testing/replay.cjs', 'testing/scenarios.cjs',
+  'core/user-badges.cjs', 'test/user-badges.test.cjs', 'schemas/live-event.v1.schema.json', 'testing/index.cjs', 'testing/replay.cjs', 'testing/scenarios.cjs',
   'examples/replay-events.cjs', 'test/event-contract.test.cjs', 'test/event-replay.test.cjs', 'test/source-audit.test.cjs',
   'docs/EVENTS.md', 'docs/EVENTS.en.md', 'docs/TESTING.md', 'docs/TESTING.en.md', 'CHANGELOG.en.md',
   'profiles/service-client.js', 'profiles/provider.js', 'test/profiles-service.test.cjs', 'scripts/test-profile-browser-fixture.cjs',
@@ -28,10 +28,10 @@ const allowed = new Set([
   'test/core-capabilities.test.cjs',
   'scripts/audit-source.cjs', 'scripts/build-java.cjs', 'scripts/java-runtime.cjs', 'scripts/test.cjs', 'scripts/test-java.cjs'
 ]);
-for (const name of ['BilibiliExtraEvents', 'BilibiliGiftV2', 'BilibiliInteractV2', 'Collector', 'ConnectionFailure', 'DouyinPkScores',
+for (const name of ['UserBadges', 'BilibiliExtraEvents', 'BilibiliGiftV2', 'BilibiliInteractV2', 'Collector', 'ConnectionFailure', 'DouyinPkScores',
   'DouyinAuthenticatedClient', 'KuaishouAvatarCache', 'KuaishouExtraEvents', 'MessageEmotes', 'PkEvents', 'ViewerSnapshots'])
   allowed.add(`collector/src/main/java/local/furryup/${name}.java`);
-for (const name of ['BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',
+for (const name of ['UserBadges', 'BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',
   'ExpandedEvent', 'KuaishouAvatar', 'KuaishouExtraEvents', 'PkEvents', 'PlatformEvent', 'ViewerSnapshots'])
   allowed.add(`collector/src/test/java/local/furryup/${name}Fixture.java`);
 const skipped = new Set(['.git', 'node_modules', 'collector/target']);

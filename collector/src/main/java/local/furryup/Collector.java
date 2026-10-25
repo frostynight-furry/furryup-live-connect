@@ -283,6 +283,8 @@ public final class Collector {
     }
     if (!avatar.isBlank() && avatar.length() <= 4096) e.put("avatar_url", avatar);
     badge(e, msg);
+    var userBadges = UserBadges.extract(platform, msg, e);
+    if (!userBadges.isEmpty()) e.set("user_badges", userBadges);
     return e;
   }
   @SuppressWarnings("unchecked")

@@ -385,3 +385,9 @@ async function startFourPlatforms({
 `profileOptions` 可配置 `spacingMs=1000`（`0–60000`）、`timeoutMs=5000`（`1–60000`）、`positiveTtlMs=1800000`、`negativeTtlMs=300000`、`cooldownMs=300000`（后三项均 `1–86400000`）、`maxEntries=2048`（`1–2048`）、`maxQueued=64`（`1–64`）。快手房间的 `roomId`、Cookie 与完成回调由房间会话设置。生产接入应保留合理间隔；多个房间的限速不是全局账号限速。
 
 这些是局部缓存、队列和消息边界，不是整个 JVM / Electron 的总内存限制，也不是平台吞吐保证。收到快照后多久显示为过期、是否持久化、跨进程去重和业务任务排队由调用方实现。进一步排查见 [故障排查](TROUBLESHOOTING.md)。
+
+### Multiple sender badges (0.7.0)
+
+Optional `user_badges` is an array of up to 16 `{kind, label, level?}` entries. Kinds: role, membership, fans, wealth, level, title. Labels are at most 64 characters; levels are integers 1–1000. Missing values stay absent. Legacy badge_name/badge_level remain supported. These are display metadata on the original message, never authorization or evidence of current room membership. Do not cache or transfer badges between users or rooms.
+
+Bilibili: current message room admin/fleet, medal and explicit levels. Douyin: fans club, pay grade, user level, explicit badge text. Kuaishou: assistant role, wealth, fans intimacy, named badges/nameplate. WeChat: known role/global reward/intimacy/super-fans badgeInfos values. Image-only titles and unknown enums are not guessed.

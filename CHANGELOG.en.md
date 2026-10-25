@@ -1,3 +1,7 @@
+## 0.7.0 — local candidate
+
+Message-local user_badges for multiple platform titles and levels. Uses existing OrdinaryRoad 1.5.8 models and official WeChat badgeInfos enums. Unknown labels remain absent; no permissions, image assets or identity cache are introduced. Real live delivery remains unverified.
+
 # Changelog
 
 [中文](CHANGELOG.md)

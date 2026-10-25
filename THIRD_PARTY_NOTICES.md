@@ -45,3 +45,7 @@ The Douyin pair-score adapter independently reads the wire fields and UPDATE dis
 ## Downloaded build/runtime dependencies
 
 Maven and npm resolve transitive dependencies separately under their respective licenses. Electron is used only as a development/runtime dependency for the example. Consult dependency POMs and the JAR `META-INF` license/notice files and Electron notices before redistributing any binaries. No Java runtime, source archive, or dependency binary is distributed by this source repository.
+
+## Multiple sender badges (0.7.0)
+
+UserBadges uses the existing OrdinaryRoad 1.5.8 protobuf and message models. Bilibili message-local admin, fleet, medal and level fields were checked against xfgryujk/blivedm models/web.py (MIT). WeChat badgeInfos type/role enums were checked against the official 805.b6dd9a5a.js and 969.9949886a.js resources linked above. No official JavaScript, icons or account data are redistributed. Badge text remains platform-supplied display metadata, not an authorization decision.

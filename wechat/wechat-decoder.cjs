@@ -46,6 +46,22 @@ function identity(message, kind, contact = message) {
     user_name: boundedText(contact.nickname, 64),
     avatar_url: boundedText(contact.headUrl || contact.headImgUrl, 2048) };
 }
+// Official assistant badgeInfos enums; unknown types/role values stay absent.
+// These are labels on this message, not permissions or a persistent viewer profile.
+function userBadges(contact) {
+  const badges = [];
+  for (const item of (Array.isArray(contact?.badgeInfos) ? contact.badgeInfos : []).slice(0, 32)) {
+    if (!item || typeof item !== 'object') continue;
+    const type = counter(item.badgeType), level = counter(item.badgeLevel);
+    if (type === 5) {
+      const label = ({ 1: '主播', 3: '助手', 4: '助手', 5: '主播', 10: '房管' })[level];
+      if (label) badges.push({ kind: 'role', label });
+    } else if ((type === 2 || type === 4) && level > 0 && level <= 1000) {
+      badges.push({ kind: type === 2 ? 'wealth' : 'fans', label: type === 2 ? '等级' : '亲密度', level });
+    } else if (type === 12) badges.push({ kind: 'membership', label: '超级粉丝' });
+  }
+  return badges.length ? { user_badges: badges } : {};
+}
 function decodeWechatResponse(body, request = {}) {
   if (typeof body !== 'string' || Buffer.byteLength(body, 'utf8') > MAX_BODY) throw new Error('Invalid response');
   const response = JSON.parse(body);
@@ -73,7 +89,7 @@ function decodeWechatResponse(body, request = {}) {
     const viewer = { username: message.username || contact?.username,
       nickname: contact?.nickname || message.nickname,
       headUrl: contact?.headUrl || contact?.headImgUrl || message.headUrl || message.headImgUrl };
-    events.push({ ...identity(message, 'msg', viewer),
+    events.push({ ...identity(message, 'msg', viewer), ...userBadges(message.finderLiveContact),
       event_type: type === 1 ? 'comment' : 'enter', content: boundedText(message.content) });
   }
   for (const message of (Array.isArray(data.appMsgList) ? data.appMsgList : []).slice(0, 2000)) {
@@ -84,7 +100,7 @@ function decodeWechatResponse(body, request = {}) {
     if (![20009, 20006, 20078, 20122, 20125].includes(type)) continue;
     const from = message.fromUserContact || {};
     const contact = from.contact || {};
-    const user = identity(message, 'app', { ...contact, nickname: contact.nickname || from.displayNickname });
+    const user = { ...identity(message, 'app', { ...contact, nickname: contact.nickname || from.displayNickname }), ...userBadges(from) };
     if (type === 20006) { events.push({ ...user, event_type: 'like', count: 1, count_mode: 'signal' }); continue; }
     if (type !== 20009) {
       try {

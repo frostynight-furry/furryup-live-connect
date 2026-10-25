@@ -1,3 +1,7 @@
+## 0.7.0 — 本地候选
+
+新增随消息传递的 user_badges 多头衔，复用 OrdinaryRoad 1.5.8 与微信官方 badgeInfos 枚举。未知字段留空，不增加权限、图片资产或身份缓存。真实直播投递仍待验收。
+
 # 更新记录
 
 [English](CHANGELOG.en.md)
