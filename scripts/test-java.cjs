@@ -13,7 +13,7 @@ function run(name, encoding = 'UTF-8', args = []) {
   assert.equal(result.status, 0, `${name}: ${result.error?.message || result.stderr?.toString('utf8') || 'failed'}`);
   return new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
 }
-for (const name of ['BilibiliExtraEventsFixture', 'BilibiliGiftMetadataFixture', 'BilibiliMainInteractionsFixture', 'BilibiliV2Fixture',
+for (const name of ['UserBadgesFixture', 'BilibiliExtraEventsFixture', 'BilibiliGiftMetadataFixture', 'BilibiliMainInteractionsFixture', 'BilibiliV2Fixture',
   'DouyinHandshakeFixture', 'ExpandedEventFixture', 'KuaishouAvatarFixture', 'KuaishouExtraEventsFixture',
   'PkEventsFixture', 'ViewerSnapshotsFixture']) {
   run(name);

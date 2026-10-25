@@ -1,6 +1,7 @@
 // Copyright (c) 2026 FrostyNight.
 // Extracted from the FurryUP Studio live-connect core; see LICENSE.
 'use strict';
+const { normalizeUserBadges } = require('./user-badges.cjs');
 const { EventEmitter } = require('node:events');
 const { randomUUID } = require('node:crypto');
 const { avatarInfo } = require('./avatar-cache.cjs');
@@ -185,6 +186,8 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
   const sourceId = messageId(raw.event_id) || sourceMessageId || randomUUID();
   const giftImage = avatarInfo(raw.gift_image_url, platform);
   const rich = {};
+  const userBadges = normalizeUserBadges(raw);
+  if (userBadges.length) rich.user_badges = userBadges;
   if (isPk) rich.pk = normalizePk(raw.pk, platform);
   if (isViewers) {
     const value = raw.viewer_snapshot;

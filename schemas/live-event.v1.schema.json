@@ -275,6 +275,40 @@
     },
     "pk": {
       "$ref": "#/definitions/pk"
+    },
+    "user_badges": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "label"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "membership",
+              "fans",
+              "wealth",
+              "level",
+              "title"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      }
     }
   },
   "additionalProperties": true,
