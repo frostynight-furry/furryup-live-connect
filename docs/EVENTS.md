@@ -2,7 +2,9 @@
 
 [English](EVENTS.en.md) · [测试与回放](TESTING.md) · [JSON Schema](../schemas/live-event.v1.schema.json)
 
-适用：LiveConnect 0.6.0；事件 `schemaVersion` 仍为 **1**。主页/粉丝数快照属于独立模块，不是直播互动事件。四平台为 `bilibili`、`douyin`、`kuaishou`、`wechat`；小红书不包含直播采集。
+适用：LiveConnect 0.7.2；事件 `schemaVersion` 仍为 **1**。主页/粉丝数快照属于独立模块，不是直播互动事件。四平台为 `bilibili`、`douyin`、`kuaishou`、`wechat`；小红书不包含直播采集。
+
+可选 `user_badges` 最多 16 项，每项为 `{kind, label, level?}`；`kind` 为 `role`、`membership`、`fans`、`wealth`、`level` 或 `title`，标签最多 64 字符，等级为 1–1000 的整数。缺失保持缺失，旧 `badge_name` / `badge_level` 继续兼容。头衔只属于当前消息发送者，不可跨用户／房间缓存，不作为权限或当前成员身份依据。仅识别明确字段和已核对的资源标识，不分发平台图片或猜测未知图片含义。
 
 ## 输入、输出与兼容
 

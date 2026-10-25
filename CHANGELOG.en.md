@@ -1,20 +1,22 @@
-## 0.7.2 — local candidate
+# Changelog
+
+[中文](CHANGELOG.md)
+
+## 0.7.2 — 2026-10-26
+
+First public 0.7.x release, including all 0.7.0 and 0.7.1 changes below. Event schemaVersion 1 remains compatible. Validation covers offline component regressions; sustained delivery across all four live platforms remains unverified.
 
 Recognize the explicit star-guardian resource on active Douyin fans badges and retain the club name and level in one badge. Named badge accessibility descriptions no longer create duplicate titles. Unknown assets, inactive status and mismatched levels cannot promote ordinary fans. Regression fixtures are synthetic; no platform images or private messages are included.
 
-## 0.7.1 — local candidate
+## 0.7.1 — first published with 0.7.2
 
 Read preserved Kuaishou author-view protobuf segments, keep club name and level together, and recognize verified gold fans, annual diamond fans, guardian, honored guest, core audience and rank identifiers. No color/wealth-based identity inference or platform image redistribution.
 
 Normalize Douyin administrator and level badge image descriptions into semantic badges, avoid duplicate honor/fans levels, and prefer an available fans club name. Synthetic regressions cover the reported shape without identity inference or permission changes.
 
-## 0.7.0 — local candidate
+## 0.7.0 — first published with 0.7.2
 
 Message-local user_badges for multiple platform titles and levels. Uses existing OrdinaryRoad 1.5.8 models and official WeChat badgeInfos enums. Unknown labels remain absent; no permissions, image assets or identity cache are introduced. Real live delivery remains unverified.
-
-# Changelog
-
-[中文](CHANGELOG.md)
 
 ## 0.6.0 — 2026-10-23
 

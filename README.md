@@ -17,7 +17,9 @@ Four-platform livestream events, a versioned contract and offline replay tools, 
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-版本 `0.6.0`。包含独立的[五平台主页与粉丝数模块](docs/PROFILES.md)，包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+版本 `0.7.2`。包含独立的[五平台主页与粉丝数模块](docs/PROFILES.md)，包含基于 **OrdinaryRoad 1.5.8** 的 Java 采集器、视频号后台采集器、协议适配、统一事件订阅、消息去重、头像缓存与快手资料补全，以及合成数据回归用例。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。
+
+0.7.2 汇总四平台随消息传递的 `user_badges` 多头衔、抖音管理员与等级去重、明确星守护标记，以及快手金粉／钻粉年费等徽章适配。字段缺失时不猜测身份，旧粉丝牌字段保持兼容；头衔仅供显示，不授予权限。详见[更新记录](CHANGELOG.md)与[字段规范](docs/EVENTS.md)，离线验证不代表四平台长时实播已通过。
 
 粉丝数能力按平台区分：B站公开接口、小红书公开主页为需显式开启的实验适配；抖音新增宿主浏览器公开主页读取，抖音/快手另有可选官方授权流程；视频号保留手动模式。五个平台均有明确的识别/状态接口，不代表五个平台都能仅凭链接自动获取。运行 `npm run demo:profiles` 查看不联网的合成示例，运行 `npm run test:profiles` 验证新模块。
 
