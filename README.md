@@ -18,18 +18,20 @@ Four-platform livestream events, a versioned contract and offline replay tools, 
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-当前版本 **[0.7.3](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.3)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
+当前版本 **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.8.0)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
 
 | 能力 | 当前范围 |
 | --- | --- |
 | 四平台直播接入 | B站、抖音、快手、视频号；统一订阅、消息去重与有界头像缓存，事件覆盖按平台区分 |
 | 观众多头衔 | 随当前消息传递 `user_badges`，包含有明确来源的角色、粉丝牌、等级及守护等标记 |
 | 事件规范与回放 | schemaVersion 1、JSON Schema、四平台合成示例，以及重复／乱序、切房和重连回归 |
-| 主页与粉丝数 | 独立模块另含小红书；按平台使用实验公开接口、可选授权、浏览器读取或手动模式，小红书无直播采集 |
+| 主页与粉丝数 | 独立模块另含小红书；新增本人创作者后台 Electron 会话采集，原实验公开／OAuth／手动接口保留；小红书无直播采集 |
 
 0.7.3 修复哔哩哔哩网页认证字段和压缩协商，并增加 20 个礼物的真实 SDK 离线回放，验证逐笔与批量礼物、重复通知及连击累计提示不会重复计数。保留 0.7.2 的四平台多头衔能力，事件 `schemaVersion` 仍为 1。详见[更新记录](CHANGELOG.md)与[字段规范](docs/EVENTS.md)；离线验证不代表真实账号接收或四平台长时实播已通过。
 
-粉丝数能力按平台区分：B站公开接口、小红书公开主页为需显式开启的实验适配；抖音新增宿主浏览器公开主页读取，抖音/快手另有可选官方授权流程；视频号保留手动模式。五个平台均有明确的识别/状态接口，不代表五个平台都能仅凭链接自动获取。运行 `npm run demo:profiles` 查看不联网的合成示例，运行 `npm run test:profiles` 验证新模块。
+新增 [本人创作者后台采集](docs/CREATOR_FOLLOWERS.md)：B站、抖音、快手、视频号的来源实现已通过本人真实读取与重启复验；小红书仅合成验证。支持账号隔离、精确／近似值、登录回跳和身份核对，不需要完整客户端。组件提取后的验收为合成测试，实测边界详见文档。
+
+原公开主页接口的粉丝数能力按平台区分：B站公开接口、小红书公开主页为需显式开启的实验适配；抖音新增宿主浏览器公开主页读取，抖音/快手另有可选官方授权流程；视频号保留手动模式。五个平台均有明确的识别/状态接口，不代表五个平台都能仅凭链接自动获取。运行 `npm run demo:profiles` 查看不联网的合成示例，运行 `npm run test:profiles` 验证新模块。
 
 本目录通过 Maven 使用 OrdinaryRoad 已发布的三个模块，**没有复制完整 OrdinaryRoad 项目，也不是它的官方维护仓库**。FurryUP Studio 主程序、插件管理器、账户服务、直播助手、弹幕气泡和礼物特效不在拆分范围内。
 

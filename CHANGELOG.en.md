@@ -2,6 +2,12 @@
 
 [中文](CHANGELOG.md)
 
+## 0.8.0 — 2026-10-26
+
+Add standalone `createCreatorFollowerBrowser`: five-platform own-account creator sessions, identity checks, exact/rounded values, bounded cancellation/cleanup, Bilibili/Kuaishou login recovery and Channels HTTP 201 statistics. Electron is injected by the host; existing profiles and live-event APIs remain compatible, with unchanged event schemaVersion.
+
+Extract the previously validated host implementation, with configurable session prefixes, app names and UA product tokens; add an independent example, bilingual integration docs and synthetic Electron checks. The originating implementation passed four-platform live reads and fresh-process reuse; Xiaohongshu has no real-account validation. No long-term availability guarantee or private product/user/session material is included.
+
 ## 0.7.3 — 2026-10-26
 
 Repair incomplete Bilibili web authentication in OrdinaryRoad 1.5.8: supply `platform: web`, `type: 2`, `scene: room` and ACK support, and negotiate the SDK's existing zlib protocol 2. The authentication frame itself remains uncompressed protocol 1. SDK room resolution, account, device and token handling are preserved.

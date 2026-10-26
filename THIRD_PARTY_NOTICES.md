@@ -53,3 +53,7 @@ Maven and npm resolve transitive dependencies separately under their respective 
 ## Multiple sender badges (0.7.0)
 
 UserBadges uses the existing OrdinaryRoad 1.5.8 protobuf and message models. Bilibili message-local admin, fleet, medal and level fields were checked against xfgryujk/blivedm models/web.py (MIT). WeChat badgeInfos type/role enums were checked against the official 805.b6dd9a5a.js and 969.9949886a.js resources linked above. No official JavaScript, icons or account data are redistributed. Badge text remains platform-supplied display metadata, not an authorization decision.
+
+## Creator-center statistics (0.8.0)
+
+The independently authored Electron adapter uses creator-card locations researched against [QianFan Sync at fbf79a49](https://github.com/DevilJie/social-auto-upload-web-ui/tree/fbf79a49b639a1b762e4d5c4ec48c87094e860cd). Its root MIT file and README use terms differ; no Python, publishing or stealth-browser implementation is copied or bundled. The Channels auth_data field was additionally checked against wordweb/Get-Tencent-Video-Live-Barrage-Gifts as an endpoint reference; no code from that repository is copied. Kuaishou and Channels self-statistics fields were confirmed in the originating host. All committed fixtures are authored synthetic data. No official page code, assets, account identifiers, cookies or live responses are distributed. See the bilingual creator collection documentation for scope, reuse decisions and real-validation limits.

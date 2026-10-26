@@ -6,14 +6,14 @@
 
 **A developer component for multi-platform livestream data, continuing as MIT open source.** Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API, with message-local sender badges, avatars and gift metadata. Includes a versioned event contract, synthetic replay tools and independent profile/follower adapters. Integrate it into your own chat tools, live assistants, desktop pets or OBS components; capabilities vary by platform.
 
-Version **[0.7.3](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.3)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
+Version **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.8.0)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
 
 | Capability | Current scope |
 | --- | --- |
 | Four live platforms | Bilibili, Douyin, Kuaishou and WeChat Channels; shared subscriptions, deduplication and bounded avatar caching; supported events vary |
 | Multiple sender badges | Message-local `user_badges` with explicitly sourced roles, fans medals, levels and membership labels |
 | Event contract and replay | schemaVersion 1, JSON Schema, synthetic examples and duplicate/out-of-order, room-switch and reconnect regressions |
-| Profiles and followers | Separate module also recognizes Xiaohongshu; experimental public APIs, optional OAuth, browser reading or manual mode vary by platform; no Xiaohongshu live collector |
+| Profiles and followers | Separate module also recognizes Xiaohongshu; new authenticated creator-center Electron sessions, alongside existing public/OAuth/manual clients; no Xiaohongshu live collector |
 
 0.7.3 repairs Bilibili web authentication fields and compression negotiation. Actual SDK offline replays verify twenty individual or batched gifts, duplicate transactions and cumulative combo notifications without double-counting. The four-platform sender badges from 0.7.2 remain available; event `schemaVersion` stays at 1. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish real-account delivery or sustained live-platform acceptance.
 
@@ -22,7 +22,9 @@ Created and maintained by [FrostyNight (夜霜)](https://github.com/frostynight-
 - **Streamers looking for the complete application:** [Explore FurryUP Studio](https://frostynight.top/furryup) · [Downloads and release notes](https://github.com/frostynight-furry/furryup-studio-releases).
 - **Developers integrating the component:** [Try the offline demo](#try-the-offline-demo) · [API reference (中文)](docs/API.md). The component works independently.
 
-See [Profiles and followers (中文)](docs/PROFILES.md) for the standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+New [creator-center collection](docs/CREATOR_FOLLOWERS.en.md) supports isolated local sessions, exact versus rounded values, login recovery and account identity checks. The originating implementation passed real reads and fresh-process reuse for Bilibili, Douyin, Kuaishou and Channels; Xiaohongshu remains synthetic-only. Extracted-component tests are synthetic; see the documented validation limits.
+
+For the unchanged public-profile client, see [Profiles and followers (中文)](docs/PROFILES.md) for the standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
 
 ## Event contract and replay tools
 
