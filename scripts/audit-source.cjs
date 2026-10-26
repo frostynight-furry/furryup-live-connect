@@ -29,9 +29,9 @@ const allowed = new Set([
   'scripts/audit-source.cjs', 'scripts/build-java.cjs', 'scripts/java-runtime.cjs', 'scripts/test.cjs', 'scripts/test-java.cjs'
 ]);
 for (const name of ['UserBadges', 'BilibiliExtraEvents', 'BilibiliGiftV2', 'BilibiliInteractV2', 'Collector', 'ConnectionFailure', 'DouyinPkScores',
-  'DouyinAuthenticatedClient', 'KuaishouAvatarCache', 'KuaishouExtraEvents', 'MessageEmotes', 'PkEvents', 'ViewerSnapshots'])
+  'BilibiliAuthenticatedClient', 'DouyinAuthenticatedClient', 'KuaishouAvatarCache', 'KuaishouExtraEvents', 'MessageEmotes', 'PkEvents', 'ViewerSnapshots'])
   allowed.add(`collector/src/main/java/local/furryup/${name}.java`);
-for (const name of ['UserBadges', 'BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',
+for (const name of ['UserBadges', 'BilibiliHandshake', 'BilibiliGiftCombo', 'BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',
   'ExpandedEvent', 'KuaishouAvatar', 'KuaishouExtraEvents', 'PkEvents', 'PlatformEvent', 'ViewerSnapshots'])
   allowed.add(`collector/src/test/java/local/furryup/${name}Fixture.java`);
 const skipped = new Set(['.git', 'node_modules', 'collector/target']);
