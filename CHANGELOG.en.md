@@ -2,6 +2,12 @@
 
 [中文](CHANGELOG.md)
 
+## 0.7.3 — 2026-10-26
+
+Repair incomplete Bilibili web authentication in OrdinaryRoad 1.5.8: supply `platform: web`, `type: 2`, `scene: room` and ACK support, and negotiate the SDK's existing zlib protocol 2. The authentication frame itself remains uncompressed protocol 1. SDK room resolution, account, device and token handling are preserved.
+
+Add actual SDK authentication and zlib gift replays: twenty individual V1/V2 flower transaction pairs and a replayed V2 batch of twenty both count exactly twenty. Cumulative `COMBO_SEND` notifications are not counted again as gift deltas. No live room was reconnected; offline checks do not confirm live recovery. Event schemaVersion 1 remains compatible.
+
 ## 0.7.2 — 2026-10-26
 
 First public 0.7.x release, including all 0.7.0 and 0.7.1 changes below. Event schemaVersion 1 remains compatible. Validation covers offline component regressions; sustained delivery across all four live platforms remains unverified.

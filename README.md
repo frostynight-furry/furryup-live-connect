@@ -18,7 +18,7 @@ Four-platform livestream events, a versioned contract and offline replay tools, 
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-当前版本 **[0.7.2](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.2)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
+当前版本 **[0.7.3](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.3)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
 
 | 能力 | 当前范围 |
 | --- | --- |
@@ -27,7 +27,7 @@ Four-platform livestream events, a versioned contract and offline replay tools, 
 | 事件规范与回放 | schemaVersion 1、JSON Schema、四平台合成示例，以及重复／乱序、切房和重连回归 |
 | 主页与粉丝数 | 独立模块另含小红书；按平台使用实验公开接口、可选授权、浏览器读取或手动模式，小红书无直播采集 |
 
-0.7.2 汇总四平台随消息传递的 `user_badges` 多头衔、抖音管理员与等级去重、明确星守护标记，以及快手金粉／钻粉年费等徽章适配。字段缺失时不猜测身份，旧粉丝牌字段保持兼容；头衔仅供显示，不授予权限。详见[更新记录](CHANGELOG.md)与[字段规范](docs/EVENTS.md)，离线验证不代表四平台长时实播已通过。
+0.7.3 修复哔哩哔哩网页认证字段和压缩协商，并增加 20 个礼物的真实 SDK 离线回放，验证逐笔与批量礼物、重复通知及连击累计提示不会重复计数。保留 0.7.2 的四平台多头衔能力，事件 `schemaVersion` 仍为 1。详见[更新记录](CHANGELOG.md)与[字段规范](docs/EVENTS.md)；离线验证不代表真实账号接收或四平台长时实播已通过。
 
 粉丝数能力按平台区分：B站公开接口、小红书公开主页为需显式开启的实验适配；抖音新增宿主浏览器公开主页读取，抖音/快手另有可选官方授权流程；视频号保留手动模式。五个平台均有明确的识别/状态接口，不代表五个平台都能仅凭链接自动获取。运行 `npm run demo:profiles` 查看不联网的合成示例，运行 `npm run test:profiles` 验证新模块。
 

@@ -2,7 +2,7 @@
 
 [中文](EVENTS.md) · [Testing and replay](TESTING.en.md) · [JSON Schema](../schemas/live-event.v1.schema.json)
 
-Applies to LiveConnect 0.7.2; event `schemaVersion` remains **1**. Profile/follower snapshots are a separate API, not livestream interactions. Live platforms are `bilibili`, `douyin`, `kuaishou` and `wechat`; there is no Xiaohongshu live collector.
+Applies to LiveConnect 0.7.3; event `schemaVersion` remains **1**. Profile/follower snapshots are a separate API, not livestream interactions. Live platforms are `bilibili`, `douyin`, `kuaishou` and `wechat`; there is no Xiaohongshu live collector.
 
 Optional `user_badges` contains at most 16 `{kind, label, level?}` entries. Kinds are `role`, `membership`, `fans`, `wealth`, `level` and `title`; labels are at most 64 characters and levels are integers 1–1000. Missing values remain absent; legacy `badge_name` / `badge_level` stay compatible. Badges belong only to the current sender/message: never cache them across users or rooms or treat them as permissions or proof of current membership. Only explicit fields and verified resource identifiers are recognized; platform images are not redistributed and unknown image meanings are not inferred.
 

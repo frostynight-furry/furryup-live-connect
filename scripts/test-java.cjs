@@ -13,7 +13,7 @@ function run(name, encoding = 'UTF-8', args = []) {
   assert.equal(result.status, 0, `${name}: ${result.error?.message || result.stderr?.toString('utf8') || 'failed'}`);
   return new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
 }
-for (const name of ['UserBadgesFixture', 'BilibiliExtraEventsFixture', 'BilibiliGiftMetadataFixture', 'BilibiliMainInteractionsFixture', 'BilibiliV2Fixture',
+for (const name of ['UserBadgesFixture', 'BilibiliHandshakeFixture', 'BilibiliExtraEventsFixture', 'BilibiliGiftMetadataFixture', 'BilibiliMainInteractionsFixture', 'BilibiliV2Fixture',
   'DouyinHandshakeFixture', 'ExpandedEventFixture', 'KuaishouAvatarFixture', 'KuaishouExtraEventsFixture',
   'PkEventsFixture', 'ViewerSnapshotsFixture']) {
   run(name);
@@ -45,6 +45,17 @@ for (const encoding of ['GBK', 'UTF-8']) {
   console.log(`PASS CollectorWireFixture (${encoding} host encoding)`);
 }
 const platforms = run('PlatformEventFixture').trim().split(/\r?\n/).map(JSON.parse).filter(row => row.kind === 'event');
+for (const mode of ['v1-combo', 'v2-bulk']) {
+  const { LiveEventStream } = require('../core/index.cjs'), stream = new LiveEventStream();
+  const records = run('BilibiliGiftComboFixture', 'UTF-8', [mode]).trim().split(/\r?\n/).map(JSON.parse);
+  const emitted = records.filter(row => row.kind === 'event').map(row => row.event);
+  const accepted = emitted.map(event => stream.push(event, 'bilibili', 'fixture-room')).filter(Boolean);
+  assert.equal(accepted.reduce((sum, event) => sum + event.gift_count, 0), 20);
+  assert.equal(accepted.length, mode === 'v1-combo' ? 20 : 1);
+  assert.ok(accepted.every(event => event.gift_name === '小花花' && event.count_mode === 'delta'));
+  assert.equal(records.filter(row => row.metric === 'giftParseErrors').length, 0);
+  console.log(`PASS Bilibili ${mode}: 20 flowers, V1/V2 duplicate suppression, COMBO_SEND not double-counted, real zlib SDK decode`);
+}
 for (const platform of ['bilibili', 'douyin', 'kuaishou'])
   for (const type of ['comment', 'gift', 'like']) assert.ok(platforms.some(row => row.event.platform === platform && row.event.event_type === type), `${platform}/${type}`);
 assert.match(run('Collector', 'UTF-8', ['--self-test']), /self-test-ok/);

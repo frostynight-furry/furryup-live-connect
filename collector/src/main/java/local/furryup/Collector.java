@@ -370,7 +370,7 @@ public final class Collector {
     try {
       switch (platform) {
         case "bilibili" -> {
-          var client = new BilibiliLiveChatClient(BilibiliLiveChatClientConfig.builder().roomId(room).cookie(cookie).autoReconnect(false).build(), listener(IBilibiliMsgListener.class)) {
+          var client = new BilibiliAuthenticatedClient(BilibiliLiveChatClientConfig.builder().roomId(room).cookie(cookie).autoReconnect(false).build(), listener(IBilibiliMsgListener.class)) {
             @Override public BilibiliRoomInitResult initRoom() {
               BilibiliRoomInitResult result = super.initRoom();
               roomInfo(result, "");
