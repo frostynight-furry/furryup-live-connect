@@ -4,6 +4,8 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
+  'profiles/creator-page.cjs', 'profiles/creator-electron.cjs', 'test/profiles-creator.test.cjs',
+  'scripts/test-creator-electron.cjs', 'examples/creator-followers-electron.cjs', 'docs/CREATOR_FOLLOWERS.md', 'docs/CREATOR_FOLLOWERS.en.md',
   'core/user-badges.cjs', 'test/user-badges.test.cjs', 'schemas/live-event.v1.schema.json', 'testing/index.cjs', 'testing/replay.cjs', 'testing/scenarios.cjs',
   'examples/replay-events.cjs', 'test/event-contract.test.cjs', 'test/event-replay.test.cjs', 'test/source-audit.test.cjs',
   'docs/EVENTS.md', 'docs/EVENTS.en.md', 'docs/TESTING.md', 'docs/TESTING.en.md', 'CHANGELOG.en.md',

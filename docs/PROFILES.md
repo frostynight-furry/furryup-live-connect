@@ -1,6 +1,8 @@
 # Five-platform profiles / 五平台主页与粉丝数
 
-Version 0.5.0 provides profile/follower adapters for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu. The existing live collectors support four platforms. **There is no Xiaohongshu live collector.** Five identifiers do not mean five automatic count APIs.
+0.8.0 adds a separate [authenticated creator-center Electron reader](CREATOR_FOLLOWERS.en.md) ([中文](CREATOR_FOLLOWERS.md)), including Kuaishou and Channels automation through the user’s own local session. The table below describes the unchanged public-profile/OAuth client, not the new reader.
+
+Version 0.5.0 originally provided profile/follower adapters for Bilibili, Douyin, Kuaishou, WeChat Channels and Xiaohongshu. The existing live collectors support four platforms. **There is no Xiaohongshu live collector.** Five identifiers do not mean five automatic count APIs.
 
 | Platform | Acquisition | Requirement |
 | --- | --- | --- |

@@ -7,4 +7,5 @@ const { readDouyinPage } = require('./browser');
 const { createProfileOAuth } = require('./oauth');
 const { createBrowserServiceReader } = require('./service-client');
 const { createConfiguredFollowerClient } = require('./provider');
-module.exports = { PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError, createFollowerClient, resolveProfile, readDouyinPage, createProfileOAuth, createBrowserServiceReader, createConfiguredFollowerClient };
+const { createCreatorFollowerBrowser } = require('./creator-electron.cjs');
+module.exports = { createCreatorFollowerBrowser, PROFILE_PLATFORMS, identifyProfile, exactCount, ProfileError, createFollowerClient, resolveProfile, readDouyinPage, createProfileOAuth, createBrowserServiceReader, createConfiguredFollowerClient };
