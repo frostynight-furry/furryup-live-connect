@@ -2,7 +2,7 @@
 
 [English](CHANGELOG.en.md)
 
-## 0.7.3 — 未发布
+## 0.7.3 — 2026-10-26
 
 修复 OrdinaryRoad 1.5.8 的哔哩哔哩认证消息缺失网页身份字段、使用旧压缩协商的问题：补齐 `platform: web`、`type: 2`、`scene: room` 和 ACK 字段，选择 SDK 已支持的 zlib 协议 2；认证帧本身仍为未压缩协议 1。保留 SDK 房间解析、账号、设备和令牌流程。
 

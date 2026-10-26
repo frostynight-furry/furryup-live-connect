@@ -2,7 +2,7 @@
 
 [中文](CHANGELOG.md)
 
-## 0.7.3 — Unreleased
+## 0.7.3 — 2026-10-26
 
 Repair incomplete Bilibili web authentication in OrdinaryRoad 1.5.8: supply `platform: web`, `type: 2`, `scene: room` and ACK support, and negotiate the SDK's existing zlib protocol 2. The authentication frame itself remains uncompressed protocol 1. SDK room resolution, account, device and token handling are preserved.
 

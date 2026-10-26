@@ -6,7 +6,7 @@
 
 **A developer component for multi-platform livestream data, continuing as MIT open source.** Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API, with message-local sender badges, avatars and gift metadata. Includes a versioned event contract, synthetic replay tools and independent profile/follower adapters. Integrate it into your own chat tools, live assistants, desktop pets or OBS components; capabilities vary by platform.
 
-Version **[0.7.2](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.2)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
+Version **[0.7.3](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.3)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
 
 | Capability | Current scope |
 | --- | --- |
@@ -15,7 +15,7 @@ Version **[0.7.2](https://github.com/frostynight-furry/furryup-live-connect/rele
 | Event contract and replay | schemaVersion 1, JSON Schema, synthetic examples and duplicate/out-of-order, room-switch and reconnect regressions |
 | Profiles and followers | Separate module also recognizes Xiaohongshu; experimental public APIs, optional OAuth, browser reading or manual mode vary by platform; no Xiaohongshu live collector |
 
-0.7.2 brings message-local `user_badges` across the four live platforms, Douyin administrator/level deduplication and explicit star-guardian recognition, and Kuaishou gold/annual diamond fans and other explicit badges. Missing fields do not imply identities; legacy fans-medal fields remain compatible. Badges are display metadata, never permissions. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish long-running live-platform acceptance.
+0.7.3 repairs Bilibili web authentication fields and compression negotiation. Actual SDK offline replays verify twenty individual or batched gifts, duplicate transactions and cumulative combo notifications without double-counting. The four-platform sender badges from 0.7.2 remain available; event `schemaVersion` stays at 1. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish real-account delivery or sustained live-platform acceptance.
 
 Created and maintained by [FrostyNight (夜霜)](https://github.com/frostynight-furry), LiveConnect grew out of FurryUP Studio's livestream integration and is available as a standalone component for developers.
 
