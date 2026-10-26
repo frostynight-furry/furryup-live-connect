@@ -18,7 +18,7 @@ Four-platform livestream events, a versioned contract and offline replay tools, 
 
 [English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
-当前开发版本 **0.8.0**，最近已发布版本为 **[0.7.3](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.3)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
+当前版本 **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.8.0)**。可以独立使用，无需安装 FurryUP Studio 或注册 FurryUP 账号。发布物为源码；三平台采集基于 **OrdinaryRoad 1.5.8**，视频号使用授权后台采集器。
 
 | 能力 | 当前范围 |
 | --- | --- |

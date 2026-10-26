@@ -2,7 +2,7 @@
 
 [English](CHANGELOG.en.md)
 
-## 0.8.0 — 本地候选，2026-10-26
+## 0.8.0 — 2026-10-26
 
 新增独立 `createCreatorFollowerBrowser`：五平台本人创作者后台会话、账号身份核对、精确／近似值区分、取消与限定清理、B站／快手登录回跳及视频号 HTTP 201 统计。Electron 由宿主注入；原 profiles 与直播事件 API 保持兼容，事件 schemaVersion 不变。
 

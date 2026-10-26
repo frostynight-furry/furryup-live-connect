@@ -6,7 +6,7 @@
 
 **A developer component for multi-platform livestream data, continuing as MIT open source.** Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API, with message-local sender badges, avatars and gift metadata. Includes a versioned event contract, synthetic replay tools and independent profile/follower adapters. Integrate it into your own chat tools, live assistants, desktop pets or OBS components; capabilities vary by platform.
 
-Development version **0.8.0**; latest published **[0.7.3](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.7.3)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
+Version **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.8.0)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
 
 | Capability | Current scope |
 | --- | --- |

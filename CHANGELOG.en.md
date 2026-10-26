@@ -2,7 +2,7 @@
 
 [中文](CHANGELOG.md)
 
-## 0.8.0 — Local candidate, 2026-10-26
+## 0.8.0 — 2026-10-26
 
 Add standalone `createCreatorFollowerBrowser`: five-platform own-account creator sessions, identity checks, exact/rounded values, bounded cancellation/cleanup, Bilibili/Kuaishou login recovery and Channels HTTP 201 statistics. Electron is injected by the host; existing profiles and live-event APIs remain compatible, with unchanged event schemaVersion.
 
