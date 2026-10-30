@@ -17,6 +17,8 @@ jobs:
       - run: npm ci
       - name: Synthetic creator-center Electron collection
         run: npm run test:creator:electron
+      - name: Synthetic creator revenue Electron collection
+        run: npm run test:revenue:electron
   browser:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
@@ -69,4 +71,5 @@ jobs:
       - run: npm run demo
       - run: npm run replay
       - run: npm run demo:profiles
+      - run: npm run demo:revenue
       - run: node scripts/audit-source.cjs --tracked

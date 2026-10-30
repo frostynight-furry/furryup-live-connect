@@ -4,6 +4,20 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const allowed = new Set([
+  'revenue/index.cjs', 'revenue/model.cjs', 'revenue/ledger.cjs', 'revenue/adapters.cjs', 'revenue/creator-electron.cjs',
+  'revenue/douyin-anchor.cjs', 'test/revenue-anchor.test.cjs',
+  'revenue/douyin-wallet.cjs', 'revenue/wallet-statement.cjs', 'revenue/wallet-sync.cjs',
+  'test/revenue-wallet.test.cjs', 'test/revenue-wallet-sync.test.cjs', 'testing/revenue-wallet-fixtures.cjs',
+  'examples/douyin-wallet-sync-electron.cjs',
+  'docs/DOUYIN_WALLET.md', 'docs/DOUYIN_WALLET.en.md',
+  'revenue/creator-sync.cjs', 'revenue/creator-sync-state.cjs', 'test/revenue-sync.test.cjs',
+  'examples/creator-revenue-sync-electron.cjs',
+  'revenue/android-device.cjs', 'revenue/douyin-wallet-android.cjs', 'test/revenue-android.test.cjs',
+  'examples/douyin-wallet-android.cjs', 'docs/REVENUE_SYNC.md', 'docs/REVENUE_SYNC.en.md', 'docs/ANDROID_REVENUE.md', 'docs/ANDROID_REVENUE.en.md',
+  'revenue/kuaishou.cjs', 'revenue/wechat-channels.cjs', 'revenue/page-transport.cjs', 'revenue/wechat-wallet-electron.cjs',
+  'testing/revenue-extra-fixtures.cjs', 'test/revenue-extra.test.cjs', 'scripts/test-revenue-extra-electron.cjs',
+  'testing/revenue-fixtures.cjs', 'test/revenue.test.cjs', 'scripts/test-revenue-electron.cjs',
+  'examples/creator-revenue-electron.cjs', 'examples/revenue-demo.cjs', 'docs/CREATOR_REVENUE.md', 'docs/CREATOR_REVENUE.en.md',
   'profiles/creator-page.cjs', 'profiles/creator-electron.cjs', 'test/profiles-creator.test.cjs',
   'scripts/test-creator-electron.cjs', 'examples/creator-followers-electron.cjs', 'docs/CREATOR_FOLLOWERS.md', 'docs/CREATOR_FOLLOWERS.en.md',
   'core/user-badges.cjs', 'test/user-badges.test.cjs', 'schemas/live-event.v1.schema.json', 'testing/index.cjs', 'testing/replay.cjs', 'testing/scenarios.cjs',

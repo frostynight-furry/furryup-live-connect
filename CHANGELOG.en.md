@@ -2,6 +2,20 @@
 
 [中文](CHANGELOG.md)
 
+## Unreleased — 2026-10-31
+
+Add `createCreatorRevenueSync/createCreatorRevenueFileStore` for shared four-platform refresh, independent source pauses, monthly checkpoints, legacy-ledger migration, restart recovery and historical corrections. Includes a persistent example and bilingual guides. Checked months do not imply complete history; missing, partial and complete coverage remain distinct.
+
+Add experimental `createDouyinWalletAndroidReader` for native identity binding and fixed GET requests in an official App-debuggable wallet WebView, with per-request identity checks and owned-forward cleanup. Actual WebView availability, identity fields and real bills await device acceptance. USB debugging alone does not establish availability; no iPhone connector is implemented. Channels video incentives still lack a verified mobile amount contract and are not replaced by other income types.
+
+Add experimental Douyin `source:'wallet'`: monthly posting-date pagination, explicit video/live classifications, statement/header reconciliation, idempotent history and corrections. Keep withdrawals, refunds and balances separate from earnings; combined creator/live income remains unsplit. Retain `createDouyinWalletSync/createRevenueFileStore` for bounded backfill, monthly checkpoints, default six-hour refresh, backoff and login pauses. Web reuse has only unauthenticated error evidence, with no real-account acceptance. Includes bilingual documentation, a persistent sync example and synthetic regression coverage.
+
+Add `createCreatorRevenueBrowser` for Douyin/Bilibili, reusing own-account creator sessions without relying on follower cards. Bilibili reads natural-month reports within the page's six-month range and returned incentive/live categories. Douyin reads dynamic categories, supported category lifetime summaries and recent 30-day details. Kuaishou adds paginated personal incentive settlement months and daily live gift-income analysis with owner verification. Channels adds native wallet handoff and categorized monthly settlement bills. Both support monthly queries, history persistence and normalized imports. Automatic Channels video incentive amounts remain unverified and explicitly require mobile viewing/import.
+
+Add Douyin source: 'anchor_dashboard' for today, rolling 7/30-day summaries and explicitly dated recent 30-day trend points, using the platform's produced-data date. Preserve native units in nativeRecords/nativeMetrics with monthly queries per unit; Yinlang is not converted to CNY. Later synchronization can complete stored months without treating open days or missing dates as complete.
+
+Add `createRevenueLedger`, `importRevenueCsv`, exact cent strings, identity isolation, idempotent persistence and complete/partial/missing monthly coverage. Rolling metrics remain separate from periods; balances and gift spending are not income. Includes a persistent Electron example, offline demo, bilingual documentation and synthetic browser regressions. Earlier unavailable history cannot be recovered automatically; CSV uses normalized daily/monthly aggregates. No real revenue-account acceptance or FUS private-product changes are claimed.
+
 ## 0.8.0 — 2026-10-26
 
 Add standalone `createCreatorFollowerBrowser`: five-platform own-account creator sessions, identity checks, exact/rounded values, bounded cancellation/cleanup, Bilibili/Kuaishou login recovery and Channels HTTP 201 statistics. Electron is injected by the host; existing profiles and live-event APIs remain compatible, with unchanged event schemaVersion.

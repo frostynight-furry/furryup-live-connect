@@ -2,7 +2,7 @@
   "name": "furryup-live-connect",
   "version": "0.8.0",
   "private": true,
-  "description": "四平台直播事件规范、合成回放与采集，以及五平台主页和粉丝数接口",
+  "description": "四平台直播事件、五平台主页和粉丝数，以及四平台创作者收益适配与月度账本",
   "license": "MIT",
   "author": "FrostyNight",
   "main": "core/index.cjs",
@@ -48,7 +48,14 @@
     "test:events": "node --test test/event-contract.test.cjs test/event-replay.test.cjs test/source-audit.test.cjs",
     "replay": "node examples/replay-events.cjs",
     "test:creator:electron": "electron scripts/test-creator-electron.cjs",
-    "start:creator": "electron examples/creator-followers-electron.cjs"
+    "start:creator": "electron examples/creator-followers-electron.cjs",
+    "test:revenue": "node --test test/revenue*.test.cjs",
+    "test:revenue:electron": "electron scripts/test-revenue-electron.cjs && electron scripts/test-revenue-extra-electron.cjs",
+    "demo:revenue": "node examples/revenue-demo.cjs",
+    "start:revenue": "electron examples/creator-revenue-electron.cjs",
+    "start:revenue:wallet": "electron examples/douyin-wallet-sync-electron.cjs",
+    "start:revenue:sync": "electron examples/creator-revenue-sync-electron.cjs",
+    "start:revenue:android": "node examples/douyin-wallet-android.cjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",
