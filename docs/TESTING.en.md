@@ -1,6 +1,20 @@
 # Offline testing and synthetic replay
 
+Douyin wallet fixtures cover monthly pagination/cursors, overlapping deduplication, reconciliation, video/live/unknown labels, refund/withdrawal exclusions, monthly corrections, checkpoints, restart, backoff, login pause, cancellation and disk failures. Electron also verifies fixed wallet GETs, identity changes even when switched back, persistence and pause integration. See [wallet acceptance limits](DOUYIN_WALLET.en.md); no real mobile wallet is accessed.
+
 [中文](TESTING.md) · [Event contract](EVENTS.en.md)
+
+## Creator revenue (unreleased)
+
+Shared scheduler regressions cover all four platforms, independent source pauses, bounded historical batches, checkpoint recovery, old-ledger migration, date windows, backoff, account switches, concurrency, cancellation and disk failure. Android tests use synthetic native callbacks and device transport to verify fixed endpoints, identities, navigation, login boundaries, timeouts, device locks, loopback forwarding and cleanup. No real phone or financial data is accessed. See [shared sync](REVENUE_SYNC.en.md) and [Android acceptance limits](ANDROID_REVENUE.en.md).
+
+`npm run test:revenue` covers exact amounts, time zones, monthly windows/mismatches, category failures, idempotent corrections, identity isolation and canonical CSV. `npm run test:revenue:electron` exercises actual Electron windows with all HTTPS traffic intercepted by synthetic responses, testing session reuse, fixed revenue GET/read-only POSTs, login/challenge failures, identity changes, response/deadline limits, concurrency, cancellation and cleanup. The Windows creator CI job runs it. `npm run demo:revenue` is offline.
+
+Anchor cases cover all three date ranges, produced-data dates, fixed routing headers, Yinlang/CNY isolation, exact decimals, completion of stored months, null/conflicting points and open current days. The same Douyin partition is reused; expired anchor login or an identity change cannot borrow another page's identity.
+
+Additional Kuaishou/Channels cases cover pagination, owner/month checks, yuan/ten-thousandth-yuan precision, missing days, video incentive imports and history restoration. The second Electron suite verifies native clients, fresh wallet login, required phone verification, expired/switched sessions, two-window deadlines and cleanup.
+
+No real revenue account is authenticated during these checks. Dashboard earnScore is not automatically net live-wallet settlement income. See [revenue documentation](CREATOR_REVENUE.en.md) for real-acceptance requirements and historical gaps.
 
 Replay needs no Java, Electron, account or network. It runs the public core with authored synthetic data and never starts a collector. The CLI accepts scenario names, not file paths or daily user data.
 

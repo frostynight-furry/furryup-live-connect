@@ -14,6 +14,7 @@ Version **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/rele
 | Multiple sender badges | Message-local `user_badges` with explicitly sourced roles, fans medals, levels and membership labels |
 | Event contract and replay | schemaVersion 1, JSON Schema, synthetic examples and duplicate/out-of-order, room-switch and reconnect regressions |
 | Profiles and followers | Separate module also recognizes Xiaohongshu; new authenticated creator-center Electron sessions, alongside existing public/OAuth/manual clients; no Xiaohongshu live collector |
+| Creator revenue (unreleased) | Four-platform adapters, automatic sync, monthly reports, persistence and canonical CSV; Channels video incentive requires import; Android wallet device acceptance remains pending |
 
 0.7.3 repairs Bilibili web authentication fields and compression negotiation. Actual SDK offline replays verify twenty individual or batched gifts, duplicate transactions and cumulative combo notifications without double-counting. The four-platform sender badges from 0.7.2 remain available; event `schemaVersion` stays at 1. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish real-account delivery or sustained live-platform acceptance.
 
@@ -24,7 +25,15 @@ Created and maintained by [FrostyNight (夜霜)](https://github.com/frostynight-
 
 New [creator-center collection](docs/CREATOR_FOLLOWERS.en.md) supports isolated local sessions, exact versus rounded values, login recovery and account identity checks. The originating implementation passed real reads and fresh-process reuse for Bilibili, Douyin, Kuaishou and Channels; Xiaohongshu remains synthetic-only. Extracted-component tests are synthetic; see the documented validation limits.
 
+Kuaishou adds personal incentive settlement months and live gift-income trends. Channels adds a native handoff to the official monthly settlement wallet. Both use the persistent monthly ledger with idempotent updates and explicit gaps. Channels video incentive amounts currently require reconciled CSV import; its desktop endpoint only identifies the mobile entry.
+
+This branch adds [creator revenue](docs/CREATOR_REVENUE.en.md) using the same own-account sessions: Bilibili natural-month reports within the page's six-month window, and Douyin categories, category lifetime summaries and recent 30-day details. A separate Douyin anchor source reads today and rolling 7/30-day summaries plus explicitly dated trend points, storing native units such as Yinlang separately from CNY. Query all stored months with explicit complete/partial/missing coverage, or import reconciled historical CNY aggregates through canonical CSV. Balances and gift spending are not treated as earnings. Try `npm run demo:revenue` offline. This module has synthetic acceptance only; FUS private UI integration and real-account revenue validation are not included.
+
 For the unchanged public-profile client, see [Profiles and followers (中文)](docs/PROFILES.md) for the standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+
+[Four-platform automatic sync](docs/REVENUE_SYNC.en.md) adds independent source pauses, bounded backfill, monthly persistence, old-ledger migration and restart recovery. `npm run start:revenue:sync -- all --watch` refreshes visible platform data while the host runs. Missing data is not zero, and unavailable historical data cannot be recovered.
+
+[Douyin mobile wallet (experimental)](docs/DOUYIN_WALLET.en.md) supports posting-month pagination, explicit video/live labels and saved statements. A new [Android native bridge reader](docs/ANDROID_REVENUE.en.md) attempts identity binding and requests through the owner's official wallet page. It requires an App-debuggable WebView; real device identity fields and bills remain unverified. No iPhone connector exists, and Channels video incentive still lacks a verified amount endpoint. Full automatic income coverage across all four platforms is not claimed.
 
 ## Event contract and replay tools
 
