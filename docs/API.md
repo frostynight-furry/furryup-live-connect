@@ -124,6 +124,8 @@ const recent = live.history({ eventTypes: ['comment'] });
 
 礼物可选字段为 `gift_image_url/id`、`gift_price_raw`、`gift_price_unit`、`gift_coin_type`、`gift_unit`、`combo_id`、`receive_user_id/name`。徽章可选字段为 `badge_name`、`badge_level`。B站会员类礼物可有 `gift_kind='membership'`，及已知时的 `membership_action='purchase'|'renew'`。
 
+快手 Java 采集器在官方本场礼物目录可用时提供单件价格，币种为 `kuaibi`（快币）；该价格与 `gift_count` 分开，不乘以连送数量。价格字段缺失代表未知，不代表免费或零价格。目录在连接前预载并定期刷新，过期或平台限制时不推测价格，其他事件继续采集。
+
 价格在核心中规范为十进制**字符串**，保留平台语义。B站普通礼物的 `bilibili_coin` 及 `gift_coin_type`、抖音的 `diamond` 取已知原始单位价格；视频号 `wechat_bean` 来自奖励消息的 `reward_amount_in_wecoin`，保留交易金额语义，不能统一再乘一次数量。B站醒目留言 `cny` 是该消息的原始金额。缺失价格、币种和图片都不会凭空补齐，也不换算跨平台收入。
 
 快手、抖音礼物保留 SDK 已计算的增量，不把每条连击的显示总数再次累计。视频号只把已确认的奖励消息计作礼物，忽略连击总数通知的重复计数。

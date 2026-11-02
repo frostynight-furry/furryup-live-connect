@@ -3,7 +3,10 @@ package local.furryup;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
+import tech.ordinaryroad.live.chat.client.bilibili.netty.handler.BilibiliCodecHandler;
 import tech.ordinaryroad.live.chat.client.bilibili.client.BilibiliLiveChatClient;
 import tech.ordinaryroad.live.chat.client.bilibili.config.BilibiliLiveChatClientConfig;
 import tech.ordinaryroad.live.chat.client.bilibili.listener.IBilibiliMsgListener;
@@ -15,8 +18,13 @@ import tech.ordinaryroad.live.chat.client.codec.bilibili.msg.UserAuthenticationM
  * defaults and its connection handler requests protocol 1. See THIRD_PARTY_NOTICES.md.
  */
 public class BilibiliAuthenticatedClient extends BilibiliLiveChatClient {
+  private final Runnable transport;
   public BilibiliAuthenticatedClient(BilibiliLiveChatClientConfig config, IBilibiliMsgListener listener) {
+    this(config, listener, () -> {});
+  }
+  public BilibiliAuthenticatedClient(BilibiliLiveChatClientConfig config, IBilibiliMsgListener listener, Runnable transport) {
     super(config, listener);
+    this.transport = transport;
   }
 
   static UserAuthenticationMsg webAuthentication(UserAuthenticationMsg original) {
@@ -43,7 +51,22 @@ public class BilibiliAuthenticatedClient extends BilibiliLiveChatClient {
 
   @Override protected void initChannel(SocketChannel channel) {
     super.initChannel(channel);
+    var codec = channel.pipeline().context(BilibiliCodecHandler.class);
+    if (codec != null) channel.pipeline().addBefore(codec.name(), "furryup-transport-health", transportHandler(transport));
     // Outbound handlers run tail-to-head: normalize before the SDK encoder.
     channel.pipeline().addLast("furryup-web-auth", authenticationHandler());
+  }
+
+  static ChannelInboundHandlerAdapter transportHandler(Runnable notify) {
+    return new ChannelInboundHandlerAdapter() {
+      private long last = Long.MIN_VALUE;
+      @Override public void channelRead(ChannelHandlerContext context, Object message) {
+        if (message instanceof BinaryWebSocketFrame frame && frame.content().readableBytes() >= 16) {
+          long now = System.nanoTime();
+          if (last == Long.MIN_VALUE || now - last >= 10_000_000_000L) { last = now; notify.run(); }
+        }
+        context.fireChannelRead(message);
+      }
+    };
   }
 }

@@ -2,6 +2,12 @@
 
 [中文](CHANGELOG.md)
 
+## 0.9.0 (source)
+
+Hosts can verify a creator after an official QR login and reuse the platform session. The revenue module syncs four platforms and preserves native units, partial coverage, and missing months. WeChat Channels exposes account balances and lifetime income separately from monthly records. The independent Douyin wallet endpoint requires its own login context.
+
+The live collectors improve Bilibili audience attribution, Kuaishou gift prices and Channels gift metadata and combo handling. The Channels collector accepts an authorized host session.
+
 ## 0.8.0 — 2026-10-26
 
 Add standalone `createCreatorFollowerBrowser`: five-platform own-account creator sessions, identity checks, exact/rounded values, bounded cancellation/cleanup, Bilibili/Kuaishou login recovery and Channels HTTP 201 statistics. Electron is injected by the host; existing profiles and live-event APIs remain compatible, with unchanged event schemaVersion.

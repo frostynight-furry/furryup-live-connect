@@ -6,7 +6,7 @@
 
 **A developer component for multi-platform livestream data, continuing as MIT open source.** Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API, with message-local sender badges, avatars and gift metadata. Includes a versioned event contract, synthetic replay tools and independent profile/follower adapters. Integrate it into your own chat tools, live assistants, desktop pets or OBS components; capabilities vary by platform.
 
-Version **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/releases/tag/v0.8.0)** · MIT license · Node.js **22.12+**. No FurryUP account or FurryUP Studio installation is required. Releases contain source code.
+Source version **0.9.0** · MIT · Node.js **22.12+**. Tagged source snapshots are available on [GitHub Releases](https://github.com/frostynight-furry/furryup-live-connect/releases).
 
 | Capability | Current scope |
 | --- | --- |
@@ -14,6 +14,7 @@ Version **[0.8.0](https://github.com/frostynight-furry/furryup-live-connect/rele
 | Multiple sender badges | Message-local `user_badges` with explicitly sourced roles, fans medals, levels and membership labels |
 | Event contract and replay | schemaVersion 1, JSON Schema, synthetic examples and duplicate/out-of-order, room-switch and reconnect regressions |
 | Profiles and followers | Separate module also recognizes Xiaohongshu; new authenticated creator-center Electron sessions, alongside existing public/OAuth/manual clients; no Xiaohongshu live collector |
+| Creator revenue | Four-platform synchronization, monthly coverage, account-level metrics and normalized CSV import |
 
 0.7.3 repairs Bilibili web authentication fields and compression negotiation. Actual SDK offline replays verify twenty individual or batched gifts, duplicate transactions and cumulative combo notifications without double-counting. The four-platform sender badges from 0.7.2 remain available; event `schemaVersion` stays at 1. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish real-account delivery or sustained live-platform acceptance.
 
@@ -24,7 +25,15 @@ Created and maintained by [FrostyNight (夜霜)](https://github.com/frostynight-
 
 New [creator-center collection](docs/CREATOR_FOLLOWERS.en.md) supports isolated local sessions, exact versus rounded values, login recovery and account identity checks. The originating implementation passed real reads and fresh-process reuse for Bilibili, Douyin, Kuaishou and Channels; Xiaohongshu remains synthetic-only. Extracted-component tests are synthetic; see the documented validation limits.
 
+The official Channels catalog returns account-level lifetime income and withdrawable balances in CNY cents. The ledger stores these under `wechat_channels.catalog` as `income/lifetime` and `balance/current`. Daily and monthly video incentive details require mobile verification. Live monthly bills also require an initialized settlement subject. Unavailable months remain missing.
+
+Bilibili checks the latest published report before querying historical months. Douyin preserves CNY and native Yinlang separately. Kuaishou retains fractional-cent daily observations through monthly aggregation. [Revenue integration](docs/CREATOR_REVENUE.en.md)
+
 For the unchanged public-profile client, see [Profiles and followers (中文)](docs/PROFILES.md) for the standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+
+[Four-platform automatic sync](docs/REVENUE_SYNC.en.md) adds independent source pauses, bounded backfill, monthly persistence, old-ledger migration and restart recovery. `npm run start:revenue:sync -- all --watch` refreshes visible platform data while the host runs. Missing data is not zero, and unavailable historical data cannot be recovered.
+
+A verified Douyin creator web session received 20003 (not logged in) from the wallet origin used by the official app. The experimental web route can return 10011 for missing app context. Creator income and anchor analytics sync independently. The Android wallet reader still needs real-device bill verification. [Wallet integration](docs/DOUYIN_WALLET.en.md)
 
 ## Event contract and replay tools
 

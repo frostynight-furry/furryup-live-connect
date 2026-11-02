@@ -66,3 +66,35 @@ test('错误、缺字段、超量目录与超大响应不制造图片', () => {
   assert.throws(() => decodeWechatGiftCatalog('{', request));
   assert.throws(() => decodeWechatGiftCatalog('x'.repeat(MAX_BODY + 1), request));
 });
+
+test('按房间及精确产品ID补名称和图标，保留实收数量、价格、身份及事件原名', () => {
+  const cache = new WechatGiftCatalog();
+  cache.ingestDetails([{ gift_id: 'gift-42', gift_name: '合成如意花', gift_image_url: image }], 'room-a', 1);
+  const missing = { ...gift, gift_name: '' };
+  assert.deepEqual(cache.enrich(missing, 'room-a'), { ...gift, gift_name: '合成如意花', gift_image_url: image });
+  assert.equal(cache.enrich(missing, 'room-b'), missing);
+  assert.equal(cache.enrich({ ...missing, gift_id: '42' }, 'room-a').gift_name, '');
+  assert.equal(cache.enrich(gift, 'room-a').gift_name, gift.gift_name);
+  assert.equal(cache.enrich({ ...missing, gift_image_url: image }, 'room-a').gift_name, '合成如意花');
+  cache.clear(); assert.equal(cache.enrich(missing, 'room-a'), missing);
+});
+
+test('消息元数据乱序、冲突、过期与容量有界，不能从旧通知恢复过期名称', () => {
+  let now = 1000;
+  const cache = new WechatGiftCatalog({ now: () => now, ttlMs: 10, maxRooms: 2, maxEntries: 2 });
+  const info = (name, id = 'gift-42') => ({ gift_id: id, gift_name: name });
+  const event = { ...gift, gift_name: '' };
+  cache.ingestDetails([info('新名称')], 'room-a', 2);
+  cache.ingestDetails([info('旧名称')], 'room-a', 1);
+  assert.equal(cache.enrich(event, 'room-a').gift_name, '新名称');
+  now += 11; assert.equal(cache.enrich(event, 'room-a'), event);
+  cache.ingestDetails([info('过期旧名称')], 'room-a', 1);
+  assert.equal(cache.enrich(event, 'room-a'), event);
+  cache.ingestDetails([info('名称甲'), info('名称乙')], 'room-a', 3);
+  cache.ingestDetails([info('迟到名称')], 'room-a', 2);
+  assert.equal(cache.enrich(event, 'room-a'), event);
+  cache.ingestDetails([info('恢复名称'), info('二', 'second'), info('三', 'third')], 'room-a', 4);
+  assert.equal(cache.details.get('room-a').size, 2);
+  cache.ingestDetails([info('乙')], 'room-b', 5); cache.ingestDetails([info('丙')], 'room-c', 6);
+  assert.equal(cache.details.size, 2); assert.equal(cache.details.has('room-a'), false);
+});

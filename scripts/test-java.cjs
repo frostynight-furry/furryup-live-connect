@@ -14,7 +14,7 @@ function run(name, encoding = 'UTF-8', args = []) {
   return new TextDecoder('utf-8', { fatal: true }).decode(result.stdout);
 }
 for (const name of ['UserBadgesFixture', 'BilibiliHandshakeFixture', 'BilibiliExtraEventsFixture', 'BilibiliGiftMetadataFixture', 'BilibiliMainInteractionsFixture', 'BilibiliV2Fixture',
-  'DouyinHandshakeFixture', 'ExpandedEventFixture', 'KuaishouAvatarFixture', 'KuaishouExtraEventsFixture',
+  'DouyinHandshakeFixture', 'ExpandedEventFixture', 'KuaishouAvatarFixture', 'KuaishouExtraEventsFixture', 'KuaishouGiftPricesFixture',
   'PkEventsFixture', 'ViewerSnapshotsFixture']) {
   run(name);
   if (name === 'PkEventsFixture') {
@@ -45,6 +45,12 @@ for (const encoding of ['GBK', 'UTF-8']) {
   console.log(`PASS CollectorWireFixture (${encoding} host encoding)`);
 }
 const platforms = run('PlatformEventFixture').trim().split(/\r?\n/).map(JSON.parse).filter(row => row.kind === 'event');
+const audience = run('BilibiliAudienceFixture').trim().split(/\r?\n/).map(JSON.parse);
+assert.deepEqual(audience.filter(row => row.kind === 'event' && Object.hasOwn(row.event, 'watching_count')).map(row => row.event.watching_count), [5,5,0,12]);
+assert.equal(audience.filter(row => row.metric === 'audienceFrames').length, 13);
+assert.equal(audience.filter(row => row.metric === 'audienceMissingCount').length, 9);
+assert.equal(audience.filter(row => row.kind === 'event' && row.event.watched_count === '200').length, 1);
+console.log('PASS Bilibili audience exact/repeated/zero/suffix/absent-field SDK decoding and bounded transport health');
 for (const mode of ['v1-combo', 'v2-bulk']) {
   const { LiveEventStream } = require('../core/index.cjs'), stream = new LiveEventStream();
   const records = run('BilibiliGiftComboFixture', 'UTF-8', [mode]).trim().split(/\r?\n/).map(JSON.parse);

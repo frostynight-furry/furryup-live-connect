@@ -117,4 +117,4 @@ class LiveConnect extends ObserverSafeEmitter {
 const createLiveConnect = options => new LiveConnect(options);
 module.exports = { PLATFORMS, EVENT_TYPES, LiveConnect, createLiveConnect, LiveEventStream, normalizeEvent,
   avatarInfo, createAvatarCache, createKuaishouProfileAvatars, fetchKuaishouProfileAvatar, createJavaCollector,
-  ...require('../profiles/index.cjs') };
+  ...require('../profiles/index.cjs'), ...require('../revenue/index.cjs') };

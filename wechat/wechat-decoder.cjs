@@ -6,6 +6,7 @@
 // 20125 is a generic interaction notice: wording is display text, not a share
 // discriminator. Never infer a paid action or share from that text.
 const MAX_BODY = 2 * 1024 * 1024;
+const { avatarInfo } = require('../core/avatar-cache.cjs');
 const LIVE_URL = 'https://channels.weixin.qq.com/platform/live/liveBuild';
 const MESSAGE_PATHS = new Set([
   '/cgi-bin/mmfinderassistant-bin/live/msg',
@@ -39,6 +40,18 @@ function payload(value) {
   const result = JSON.parse(Buffer.from(value, 'base64').toString('utf8'));
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Invalid payload');
   return result;
+}
+// Official assistant presentInfo (794.72f12fb9.js) reads reward_gift.name
+// and reward_gift.thumbnail_file_url. Combo notices supply metadata only.
+function giftDetails(gift) {
+  const id = identifier(gift.reward_product_id);
+  const nested = gift.reward_gift;
+  const valid = nested && typeof nested === 'object' && !Array.isArray(nested) &&
+    (!Object.hasOwn(nested, 'reward_product_id') || identifier(nested.reward_product_id) === id);
+  const name = boundedText(gift.reward_product_name, 100).trim() ||
+    (valid ? boundedText(nested.name, 100).trim() : '');
+  const image = valid ? avatarInfo(nested.thumbnail_file_url, 'wechat').avatar_url : '';
+  return { gift_id: id, ...(name && { gift_name: name }), ...(image && { gift_image_url: image }) };
 }
 function identity(message, kind, contact = message) {
   const sourceId = identifier(message.clientMsgId) || identifier(message.localClientMsgId) || (identifier(message.seq) ? `${kind}:${identifier(message.seq)}` : '');
@@ -78,7 +91,7 @@ function decodeWechatResponse(body, request = {}) {
   if (hasRequestRoom && (!requestRoomId || hasResponseRoom && responseRoomId !== requestRoomId))
     return { events: [], roomId: '', errors: 0 };
   if (!roomId || !/^[A-Za-z0-9_-]{1,128}$/.test(roomId)) return { events: [], roomId: '', errors: 0 };
-  const events = [];
+  const events = [], giftMetadata = [];
   let errors = 0, giftCallbacks = 0, giftParseErrors = 0;
   for (const message of (Array.isArray(data.msgList) ? data.msgList : []).slice(0, 2000)) {
     if (!message || typeof message !== 'object') { errors++; continue; }
@@ -96,7 +109,14 @@ function decodeWechatResponse(body, request = {}) {
     if (!message || typeof message !== 'object') { errors++; continue; }
     const type = counter(message.msgType);
     // 20013 is a combo-total notification, not another paid gift increment.
-    // Count confirmed 20009 rewards only; never award both for the same gift.
+    // Keep its explicit product metadata; never award both for the same gift.
+    if (type === 20013) {
+      try {
+        const details = giftDetails(payload(message.payload));
+        if (details.gift_id && (details.gift_name || details.gift_image_url)) giftMetadata.push(details);
+      } catch { /* Optional display metadata must not break paid increments. */ }
+      continue;
+    }
     if (![20009, 20006, 20078, 20122, 20125].includes(type)) continue;
     const from = message.fromUserContact || {};
     const contact = from.contact || {};
@@ -118,8 +138,10 @@ function decodeWechatResponse(body, request = {}) {
       const count = counter(gift.reward_product_count);
       const giftId = identifier(gift.reward_product_id);
       if (!giftId || !count || count > 1_000_000) throw new Error('Invalid gift');
+      const details = giftDetails(gift);
+      if (details.gift_name || details.gift_image_url) giftMetadata.push(details);
       events.push({ ...user, event_type: 'gift', gift_id: giftId, gift_count: count,
-        gift_name: boundedText(gift.reward_product_name, 100),
+        gift_name: '', ...details,
         content: boundedText(gift.content),
         gift_price_raw: gift.reward_amount_in_wecoin, gift_price_unit: 'wechat_bean' });
     } catch { errors++; giftParseErrors++; }
@@ -129,6 +151,6 @@ function decodeWechatResponse(body, request = {}) {
   if (Object.keys(stats).length) events.push({ event_type: 'room_stats', ...stats });
   // This is a snapshot. The collector emits it only on the first valid value or
   // a change, rather than adding a fresh live-status event on every long poll.
-  return { roomId, events, liveStatus: liveStatus(info.liveStatus), errors, giftCallbacks, giftParseErrors };
+  return { roomId, events, giftMetadata, liveStatus: liveStatus(info.liveStatus), errors, giftCallbacks, giftParseErrors };
 }
 module.exports = { decodeWechatResponse, isMessageUrl, LIVE_URL, MAX_BODY };

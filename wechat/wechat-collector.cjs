@@ -10,7 +10,8 @@ const MAX_LOGIN_BODY = 256 * 1024;
 const AUTH_STAGES = new Map([
   ['/cgi-bin/mmfinderassistant-bin/auth/auth_with_oauth', 'oauth'],
   ['/cgi-bin/mmfinderassistant-bin/auth/auth_finder_list', 'finder-list'],
-  ['/cgi-bin/mmfinderassistant-bin/auth/login_finder', 'finder-login']
+  ['/cgi-bin/mmfinderassistant-bin/auth/login_finder', 'finder-login'],
+  ['/cgi-bin/mmfinderassistant-bin/auth/auth_data', 'identity']
 ]);
 function authStage(value) {
   try {
@@ -57,15 +58,20 @@ const PAGE_LOAD_ERROR = '视频号后台暂时无法打开，请检查网络并�
 // The remote page never receives a preload or Node privileges. Persistence is
 // supplied by the embedding application; the example disables it entirely.
 class WechatCollector extends ObserverSafeEmitter {
-  constructor({ BrowserWindow, session, credentials, showWindows = true, onLoginDiagnostic = () => {} }) {
+  constructor({ BrowserWindow, session, credentials, showWindows = true, onLoginDiagnostic = () => {}, sharedSession }) {
     super();
     this.BrowserWindow = BrowserWindow; this.sessionApi = session; this.credentials = credentials;
     this.onLoginDiagnostic = onLoginDiagnostic;
+    this.sharedSession = sharedSession;
     this.showWindows = showWindows; this.run = null; this.stopping = null; this.retainedSession = null; this.connectGeneration = 0;
     this.loginGeneration = 0; this.stoppingRun = null; this.retainedLoginState = null;
   }
   notify(run, channel, ...args) {
     if (!run.active || typeof run[channel] !== 'function') return;
+    if (run.sharedLease) {
+      try { run.sharedLease.assertAuthorized(); }
+      catch { void this.stop(); return; }
+    }
     const failed = () => {
       if (!run.active) return;
       this.emit('observer-error', Object.freeze({ channel, code: 'OBSERVER_CALLBACK_FAILED' }));
@@ -83,33 +89,66 @@ class WechatCollector extends ObserverSafeEmitter {
     run.lastStatusRequestOrder = request.order;
     this.notify(run, 'onState', state);
   }
+  deliverGift(run, pending) {
+    if (!run.pendingGifts.delete(pending)) return;
+    clearTimeout(pending.timer);
+    if (run.active) this.notify(run, 'onEvent', run.giftCatalog.enrich(pending.event, pending.roomId), pending.roomId);
+  }
+  flushGiftDetails(run) {
+    for (const pending of run.pendingGifts) {
+      if (!run.active) break;
+      if (run.giftCatalog.enrich(pending.event, pending.roomId).gift_name) this.deliverGift(run, pending);
+    }
+  }
+  dispatchEvent(run, event, roomId) {
+    event = run.giftCatalog.enrich(event, roomId);
+    if (event.event_type !== 'gift' || event.gift_name?.trim()) {
+      this.notify(run, 'onEvent', event, roomId); return;
+    }
+    // A combo metadata notification can arrive in the next poll. Bound the wait
+    // and queue; missing metadata never drops a confirmed paid increment.
+    if (run.pendingGifts.size >= 128) this.deliverGift(run, run.pendingGifts.values().next().value);
+    if (!run.active) return;
+    const pending = { event, roomId, timer: null };
+    run.pendingGifts.add(pending);
+    pending.timer = setTimeout(() => this.deliverGift(run, pending), 3000);
+    pending.timer.unref?.();
+  }
   async connect({ remember = true, onState, onEvent, onDiagnostic = () => {} }) {
     const generation = ++this.connectGeneration;
     await this.stop({ preserveSession: true, keepConnecting: true });
     if (generation !== this.connectGeneration) return;
+    const sharedLease = this.sharedSession?.();
+    if (this.sharedSession && (!sharedLease?.session || typeof sharedLease.assertAuthorized !== 'function' || typeof sharedLease.assertIdentity !== 'function')) {
+      throw new TypeError('An authorized session and identity checks are required');
+    }
+    sharedLease?.assertAuthorized();
     const retainedSession = this.retainedSession, retainedLoginState = this.retainedLoginState;
     this.retainedSession = null; this.retainedLoginState = null;
     if (retainedSession && !remember) await retainedSession.clearStorageData().catch(() => {});
     if (generation !== this.connectGeneration) return;
-    const run = { active: true, closing: false, remember, restored: false, reused: Boolean(remember && retainedSession), loginSessionReported: false, onState, onEvent, onDiagnostic,
+    const run = { active: true, closing: false, remember, sharedLease, restored: false, reused: Boolean(remember && retainedSession), loginSessionReported: false, onState, onEvent, onDiagnostic,
       loginGeneration: this.loginGeneration, restoreGeneration: this.loginGeneration, canSaveLogin: false,
       localStorage: remember && retainedSession ? { ...retainedLoginState?.localStorage } : {},
       storageRevision: 0, invalidStorageKeys: new Set(remember && retainedSession ? retainedLoginState?.invalidStorageKeys : []), storageClosed: false,
       requests: new Map(), authRequests: new Map(), authInFlight: 0, savedTimer: null, saving: Promise.resolve(), inFlight: 0,
       metadataRequests: new Map(), metadataInFlight: 0, metadataOrder: 0, latestViewerOrder: 0,
-      giftCatalog: new WechatGiftCatalog(), messageRoomId: '',
+      giftCatalog: new WechatGiftCatalog(), pendingGifts: new Set(), messageRoomId: '',
       statusSessionId: randomUUID(), statusSequence: 0, statusRoomId: '', liveStatus: '', requestOrder: 0, lastStatusRequestOrder: 0 };
     this.run = run;
     run.cancelled = new Promise(resolve => { run.cancel = resolve; });
-    run.session = run.reused ? retainedSession : this.sessionApi.fromPartition(`furryup-live-connect-wechat-${randomUUID()}`, { cache: false });
-    if (!run.reused) {
+    run.session = sharedLease?.session || (run.reused ? retainedSession : this.sessionApi.fromPartition(`furryup-live-connect-wechat-${randomUUID()}`, { cache: false }));
+    if (!run.reused && !sharedLease) {
       run.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
       run.session.setPermissionCheckHandler(() => false);
-      run.session.on('will-download', event => event.preventDefault());
     }
+    run.preventDownload = (event, _item, contents) => {
+      if (!sharedLease || contents === run.window?.webContents) event.preventDefault();
+    };
+    run.session.on('will-download', run.preventDownload);
     let stage = 'login-record';
     try {
-      if (remember && !run.reused && this.credentials.has('wechat')) {
+      if (remember && !run.reused && !run.sharedLease && this.credentials.has('wechat')) {
         const saved = decodeWechatLogin(this.credentials.read('wechat'));
         run.localStorage = saved.localStorage;
         for (const cookie of saved.cookies) {
@@ -236,7 +275,7 @@ class WechatCollector extends ObserverSafeEmitter {
   }
   scheduleLoginSave(run) {
     clearTimeout(run.savedTimer);
-    if (run.active && run.remember) {
+    if (run.active && run.remember && !run.sharedLease) {
       run.savedTimer = setTimeout(() => {
         // Coalesce a busy page's changes instead of growing an unbounded chain
         // while a renderer or Cookie read is slow.
@@ -328,7 +367,16 @@ class WechatCollector extends ObserverSafeEmitter {
       if (typeof response.body !== 'string' || response.body.length > MAX_LOGIN_BODY * 1.4) throw new Error('Invalid login body');
       const body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString('utf8') : response.body;
       if (Buffer.byteLength(body, 'utf8') > MAX_LOGIN_BODY) throw new Error('Invalid login body');
-      Object.assign(summary, loginResponseShape(JSON.parse(body)));
+      const value = JSON.parse(body);
+      if (run.sharedLease && request.stage === 'identity' && value.errCode === 0) {
+        try { run.sharedLease.assertIdentity(value.data?.finderUser?.finderUsername); }
+        catch {
+          run.canSaveLogin = false;
+          this.notify(run, 'onState', { state: 'connect-failed', errorCode: 'PLATFORM_ACCOUNT_CHANGED', error: '视频号账号与创作者中心绑定不一致，请在创作者中心检查授权。' });
+          await this.stop(); return;
+        }
+      }
+      Object.assign(summary, loginResponseShape(value));
     } catch { /* The HTTP status remains useful when the body is unavailable. */ }
     finally {
       run.authInFlight--;
@@ -453,6 +501,9 @@ class WechatCollector extends ObserverSafeEmitter {
         for (let i = 0; i < decoded.giftCallbacks && run.active; i++) this.notify(run, 'onDiagnostic', 'giftCallbacks');
         for (let i = 0; i < decoded.giftParseErrors && run.active; i++) this.notify(run, 'onDiagnostic', 'giftParseErrors');
         if (!run.active) return;
+        run.giftCatalog.ingestDetails(decoded.giftMetadata, decoded.roomId, request.order);
+        this.flushGiftDetails(run);
+        if (!run.active) return;
         const currentSnapshot = request.order >= run.lastStatusRequestOrder;
         if (currentSnapshot) {
           run.messageRoomId = decoded.roomId;
@@ -469,7 +520,7 @@ class WechatCollector extends ObserverSafeEmitter {
         for (const event of decoded.events) {
           if (!run.active) break;
           if (event.event_type === 'room_stats' && !currentSnapshot) continue;
-          this.notify(run, 'onEvent', run.giftCatalog.enrich(event, decoded.roomId), decoded.roomId);
+          this.dispatchEvent(run, event, decoded.roomId);
         }
         if (decoded.errors) this.notifyRequestState(run, request, { error: '已忽略无法解析的视频号互动；其余消息继续接收。' });
       } catch {
@@ -478,6 +529,7 @@ class WechatCollector extends ObserverSafeEmitter {
     }
   }
   saveLogin(run) {
+    if (run.sharedLease) return Promise.resolve();
     const generation = run.loginGeneration;
     const allowed = () => run.canSaveLogin && run.remember && generation === this.loginGeneration && generation === run.loginGeneration;
     run.saving = run.saving.then(async () => {
@@ -501,6 +553,7 @@ class WechatCollector extends ObserverSafeEmitter {
     return run.saving;
   }
   async setRemember(value) {
+    if (this.sharedSession) return;
     const generation = ++this.loginGeneration, run = this.run || this.stoppingRun;
     if (run) { run.loginGeneration = generation; run.remember = value === true; clearTimeout(run.savedTimer); }
     if (value !== true) {
@@ -536,7 +589,10 @@ class WechatCollector extends ObserverSafeEmitter {
     if (!run) { if (!preserveSession) await this.clearRetainedSession(); return; }
     this.run = null; this.stoppingRun = run; run.active = false; run.cancel(); clearTimeout(run.savedTimer);
     run.metadataRequests.clear(); run.giftCatalog.clear();
+    for (const pending of run.pendingGifts) clearTimeout(pending.timer);
+    run.pendingGifts.clear();
     run.session.cookies.removeListener('changed', run.cookiesChanged || (() => {}));
+    if (run.preventDownload) run.session.removeListener('will-download', run.preventDownload);
     this.stopping = (async () => {
       // Checkpoint while the renderer still exists. If a user already closed
       // the window, the bounded DOMStorage event mirror is the last snapshot.
@@ -547,7 +603,10 @@ class WechatCollector extends ObserverSafeEmitter {
       // A normal disconnect stops collection, but keeps the entire transient
       // Chromium login, including official local storage. Rebuilding it from
       // Cookies alone loses part of WeChat's selected-account state.
-      if (preserveSession && run.remember && run.canSaveLogin) {
+      if (run.sharedLease) {
+        // The host owns login lifetime. Disconnecting transport must not log
+        // out follower/revenue readers which share the persistent partition.
+      } else if (preserveSession && run.remember && run.canSaveLogin) {
         this.retainedSession = run.session;
         this.retainedLoginState = { localStorage: { ...run.localStorage }, invalidStorageKeys: [...run.invalidStorageKeys] };
       } else await run.session.clearStorageData().catch(() => {});

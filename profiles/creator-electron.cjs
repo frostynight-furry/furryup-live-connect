@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FrostyNight. See LICENSE.
 'use strict';
 const { createHash } = require('node:crypto');
-const { PLATFORMS, allowedNavigation, parseCount, cleanIdentity, identityResponseKind, identityFromResponse, readCreatorPage } = require('./creator-page.cjs');
+const { PLATFORMS, allowedNavigation, parseCount, cleanIdentity, identityResponseKind, identityFromResponse, identityFailureFromResponse, readCreatorPage } = require('./creator-page.cjs');
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fault = code => Object.assign(new Error(code), { code });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -26,12 +26,12 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
     const account = getAccount();
     if (!owner || account?.accountId !== owner || account.kind === 'signed-out') throw fault('ACCOUNT_CHANGED');
   }
-  async function acquire({ owner, platform, interactive = false, expectedIdentity, identityKind }) {
+  async function acquire({ owner, platform, interactive = false, expectedIdentity, identityKind, identityOnly = false }) {
     check(owner, platform);
     const key = partitionFor(owner, platform, partitionPrefix);
     if (active.has(key)) throw fault('FOLLOWERS_BUSY');
     const cached = cache.get(key);
-    if (!interactive && cached && Date.now() - cached.at < cacheMs && cached.value.accountId === expectedIdentity) return structuredClone(cached.value);
+    if (!identityOnly && !interactive && cached && Date.now() - cached.at < cacheMs && cached.value.accountId === expectedIdentity) return structuredClone(cached.value);
     if (interactive) cache.delete(key);
     const storage = session.fromPartition(key, { cache: true });
     storage.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
@@ -39,7 +39,7 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
     const preventDownload = event => event.preventDefault();
     storage.on('will-download', preventDownload);
     const win = new BrowserWindow({ show: interactive, width: 1120, height: 820, autoHideMenuBar: true,
-      title: applicationName + ' · ' + translate(PLATFORMS[platform].name) + ' · ' + translate('登录后自动读取粉丝数'),
+      title: applicationName + ' · ' + translate(PLATFORMS[platform].name) + ' · ' + translate(identityOnly ? '平台账号授权' : '登录后自动读取粉丝数'),
       skipTaskbar: !interactive, webPreferences: { session: storage, nodeIntegration: false, contextIsolation: true,
         sandbox: true, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false, backgroundThrottling: false } });
     active.set(key, win);
@@ -48,7 +48,7 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
     // Reuse the existing LiveConnect WeChat collector's Chromium compatibility
     // setting. Retain Chromium/OS versions; only remove embedded app tokens.
     if (platform === 'wechat_channels') wc.setUserAgent(wc.getUserAgent().split(/\s+/).filter(token => !['Electron', 'furryup-live-connect', ...userAgentProductTokens].includes(token.split('/')[0])).join(' '));
-    let stopped = false, latest = null, latestIdentity = null, latestStats = null, revision = 0, timer, accountWatcher, closeReason = 'LOGIN_CANCELLED';
+    let stopped = false, latest = null, latestIdentity = null, latestStats = null, latestFailure = '', revision = 0, timer, accountWatcher, closeReason = 'LOGIN_CANCELLED';
     let finalError = 'LOGIN_REQUIRED';
     const requests = new Map();
     win.on('page-title-updated', event => event.preventDefault());
@@ -59,7 +59,7 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
       return { action: 'deny' };
     });
     wc.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => {
-      if (mainFrame && !inPlace) { revision++; latestIdentity = null; latestStats = null; requests.clear(); }
+      if (mainFrame && !inPlace) { revision++; latestIdentity = null; latestStats = null; latestFailure = ''; requests.clear(); }
     });
     const onProtocol = async (_event, method, params) => {
       if (stopped) return;
@@ -72,15 +72,17 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
         try {
           const result = await wc.debugger.sendCommand('Network.getResponseBody', { requestId: params.requestId });
           if (result.base64Encoded || result.body.length > 1024 * 1024 || stopped || entry.revision !== revision) return;
-          const identity = identityFromResponse(entry.kind, JSON.parse(result.body));
-          if (identity) { latestIdentity = identity; if (identity.count) latestStats = identity; }
+          const body=JSON.parse(result.body),identity = identityFromResponse(entry.kind, body);
+          if (identity) { latestIdentity = identity; latestFailure = ''; if (identity.count) latestStats = identity; }
+          else {const failure=identityFailureFromResponse(entry.kind,body);if(failure){latestFailure=failure;latestIdentity=null;latestStats=null;}}
         } catch { /* Missing/changed self-info is surfaced without recording the body. */ }
       } else if (method === 'Network.loadingFailed') requests.delete(params.requestId);
     };
     try {
       wc.debugger.attach('1.3'); wc.debugger.on('message', onProtocol);
-      // On a new hidden WebContents, CDP initialization may await the first
-      // navigation. Start both under the same bounded acquisition deadline.
+      // Bootstrap the renderer with a blank page, then await its network
+      // observer before visiting the official page. Fast self-info responses
+      // must not race Network.enable during a four-platform synchronization.
       const networkReady = wc.debugger.sendCommand('Network.enable', { maxResourceBufferSize: 1024 * 1024, maxTotalBufferSize: 2 * 1024 * 1024 });
       const deadline = new Promise((_resolve, reject) => { timer = setTimeout(() => reject(fault(finalError)), interactive ? connectTimeoutMs : refreshTimeoutMs); });
       const closed = new Promise((_resolve, reject) => win.once('closed', () => reject(fault(closeReason))));
@@ -88,7 +90,9 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
         try { check(owner, platform); } catch { closeReason = 'ACCOUNT_CHANGED'; if (!win.isDestroyed()) win.destroy(); }
       }, 500);
       const collect = async () => {
-        await Promise.all([networkReady, wc.loadURL(PLATFORMS[platform].url).catch(() => { finalError = 'NETWORK_ERROR'; })]);
+        await Promise.all([networkReady, wc.loadURL('about:blank')]);
+        check(owner, platform);
+        await wc.loadURL(PLATFORMS[platform].url).catch(() => { finalError = 'NETWORK_ERROR'; });
         let stable = '', stableSince = 0, recoveryCount = 0, recoveredAt = 0, loginOpened = false;
         const loadedAt = Date.now();
         while (!stopped && !win.isDestroyed()) {
@@ -111,6 +115,14 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
           try { page = await wc.executeJavaScriptInIsolatedWorld(999, [{ code: '(' + readCreatorPage.toString() + ')(' + JSON.stringify(platform) + ')' }]); }
           catch { finalError = 'PAGE_CHANGED'; await delay(500); continue; }
           if (page.challenge) { finalError = 'VERIFICATION_REQUIRED'; if (!interactive) throw fault(finalError); await delay(750); continue; }
+          if (latestFailure) {
+            finalError = latestFailure;
+            if (!interactive) throw fault(finalError);
+            if (!loginOpened && PLATFORMS[platform].loginUrl) {
+              loginOpened = true; await wc.loadURL(PLATFORMS[platform].loginUrl).catch(() => {}); continue;
+            }
+            await delay(750); continue;
+          }
           if (page.login) {
             finalError = 'LOGIN_REQUIRED';
             if (interactive && !loginOpened && PLATFORMS[platform].loginUrl) {
@@ -137,6 +149,20 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
           if (!identity) { finalError = 'IDENTITY_UNAVAILABLE'; await delay(750); continue; }
           const accountId = identityHash(platform, identity);
           if (expectedIdentity && accountId !== expectedIdentity) throw fault('PLATFORM_ACCOUNT_CHANGED');
+          // Host authorization verifies the owner independently of data scopes.
+          // Missing/ambiguous follower counts must not invalidate a live login.
+          if (identityOnly) {
+            const responseConfirmed = latestIdentity && latestIdentity.value === identity.value &&
+              (latestIdentity.kind === identity.kind || platform === 'kuaishou' && ['account-cookie-userId', 'account-cookie-kuaishou.userId'].includes(identity.kind));
+            const headerConfirmed = platform === 'douyin' && page.handle && page.displayName &&
+              ['handle', 'account-cookie-uid_tt'].includes(identity.kind);
+            if (!responseConfirmed && !headerConfirmed) { finalError = 'IDENTITY_UNAVAILABLE'; await delay(750); continue; }
+            if (stable !== accountId) { stable = accountId; stableSince = Date.now(); await delay(750); continue; }
+            if (Date.now() - stableSince < 700) { await delay(250); continue; }
+            check(owner, platform);
+            return { platform, accountId, identityKind: identity.kind,
+              displayName: identity.displayName || page.displayName || '', verifiedAt: new Date().toISOString() };
+          }
           if (latestStats && identityHash(platform, latestStats) !== accountId) { finalError = 'COUNT_UNAVAILABLE'; await delay(750); continue; }
           const counts = latestStats && identityHash(platform, latestStats) === accountId ? [latestStats.count] :
             (Array.isArray(page.counts) ? page.counts : []).map(parseCount).filter(Boolean);
@@ -158,7 +184,7 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
       };
       const value = await Promise.race([collect(), deadline, closed]);
       check(owner, platform);
-      cache.set(key, { at: Date.now(), value: structuredClone(value) });
+      if (!identityOnly) cache.set(key, { at: Date.now(), value: structuredClone(value) });
       return value;
     } finally {
       stopped = true; clearTimeout(timer); clearInterval(accountWatcher); requests.clear();
@@ -169,6 +195,8 @@ function createCreatorFollowerBrowser({ BrowserWindow, session, getAccount, tran
     }
   }
   return {
+    identify: request => acquire({ ...request, interactive: false, identityOnly: true }),
+    connectIdentity: request => acquire({ ...request, interactive: true, identityOnly: true }),
     connect: request => acquire({ ...request, interactive: true }),
     lookup: request => acquire({ ...request, interactive: false }),
     async disconnect({ owner, platform }) {
