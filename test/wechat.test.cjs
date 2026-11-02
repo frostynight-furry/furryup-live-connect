@@ -49,6 +49,34 @@ test('standalone decoder preserves identities and gift increments without counti
   assert.equal(decoded.events.at(-1).watching_count, 12);
 });
 
+function giftNameSample({ receipt = true, combo = true, nested = false, roomId = 'fixture-live-room' } = {}) {
+  const value = sample(); value.data.liveInfo = { liveId: roomId }; value.data.msgList = [];
+  const details = { name: '合成如意花', thumbnail_file_url: 'http://mmbiz.qpic.cn/synthetic-flower.png' };
+  value.data.appMsgList = [
+    ...(receipt ? [{ msgType: 20009, clientMsgId: 'synthetic-paid-1',
+      payload: encode({ reward_product_id: 'gift-42', reward_product_count: 1, reward_amount_in_wecoin: '5',
+        ...(nested && { reward_gift: details }) }) }] : []),
+    ...(combo ? [{ msgType: 20013, clientMsgId: 'synthetic-combo-1',
+      payload: encode({ reward_product_id: 'gift-42', combo_product_count: 99, reward_gift: details }) }] : [])
+  ];
+  return value;
+}
+
+test('嵌套礼物资料及20013名称可读取，20013累计99不生成礼物或改变实收1', () => {
+  const decoded = decodeWechatResponse(JSON.stringify(giftNameSample({ nested: true })));
+  assert.equal(decoded.events.length, 1); assert.equal(decoded.giftCallbacks, 1);
+  assert.equal(decoded.events[0].gift_count, 1); assert.equal(decoded.events[0].gift_name, '合成如意花');
+  assert.equal(decoded.events[0].gift_image_url, 'https://mmbiz.qpic.cn/synthetic-flower.png');
+  const combo = decodeWechatResponse(JSON.stringify(giftNameSample({ receipt: false })));
+  assert.deepEqual(combo.events, []); assert.equal(combo.giftCallbacks, 0);
+  assert.equal(combo.giftMetadata[0].gift_name, '合成如意花');
+  const invalid = giftNameSample({ combo: false });
+  invalid.data.appMsgList[0].payload = encode({ reward_product_id: 'gift-42', reward_product_count: 1,
+    reward_gift: { reward_product_id: 'different', name: '不能串礼物', thumbnail_file_url: 'https://private.invalid/x' } });
+  const event = decodeWechatResponse(JSON.stringify(invalid)).events[0];
+  assert.equal(event.gift_name, ''); assert.equal(event.gift_image_url, undefined);
+});
+
 test('单条损坏消息不影响其他互动；超大响应、未知事件与无效统计不会编造数据', () => {
   const value = sample();
   value.data.appMsgList.unshift({ msgType: 20009, payload: 'not-json' });
@@ -79,8 +107,8 @@ function browserFixture({ loadLive = null, messageResponse = sample, bodyRespons
       return value;
     };
     cookies.set = async cookie => { if (beforeCookieSet) await beforeCookieSet(); cookies.items.push({ ...cookie }); };
-    const session = { partition, cookies, clearCount: 0, on() {}, setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
-      async clearStorageData() { this.clearCount++; cookies.items = []; this.localStorage.clear(); } };
+    const session = Object.assign(new EventEmitter(), { partition, cookies, clearCount: 0, setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
+      async clearStorageData() { this.clearCount++; cookies.items = []; this.localStorage.clear(); } });
     class StorageMap extends Map {
       constructor(isLocalStorage) { super(); this.isLocalStorage = isLocalStorage; }
       send(method, data = {}) { session.debugger?.emit('message', {}, `DOMStorage.${method}`,
@@ -145,7 +173,7 @@ function browserFixture({ loadLive = null, messageResponse = sample, bodyRespons
     save: (_p, value) => { credentialCalls.push('save'); stored = value; }, clear: () => { credentialCalls.push('clear'); stored = ''; } };
   const collector = new WechatCollector({ BrowserWindow: FakeWindow, session: { fromPartition: (partition, options) => { assert.equal(options.cache, false); return createSession(partition); } }, credentials,
     onLoginDiagnostic: value => { loginDiagnostics.push(value); return onLoginDiagnostic?.(value); } });
-  return { collector, states, events, loginDiagnostics, get session() { return collector.run?.session || sessions.at(-1); }, sessions,
+  return { collector, states, events, loginDiagnostics, createSession, get session() { return collector.run?.session || sessions.at(-1); }, sessions,
     commands, windows, credentials, credentialCalls, saved: () => stored,
     connect: (options = {}) => collector.connect({ ...options, onState: value => states.push(value), onEvent: (event, roomId) => events.push({ event, roomId }) }) };
 }
@@ -155,6 +183,21 @@ function deferred() {
   const promise = new Promise(done => { resolve = done; });
   return { promise, resolve };
 }
+
+test('shared Channels login is owned by the host and an unexpected finder stops collection', async () => {
+  const f = browserFixture({ bodyResponse: () => ({ body: JSON.stringify({ errCode: 0, data: { finderUser: { finderUsername: 'fixture-other' } } }) }) });
+  const shared = f.createSession('fixture-host-partition');
+  f.collector.sharedSession = () => ({ session: shared, assertAuthorized() {}, assertIdentity(finder) { assert.equal(finder, 'fixture-owner'); } });
+  await f.connect();
+  assert.equal(f.session, shared);
+  await f.collector.setRemember(false);
+  await authResponse(f, 'fixture-identity', 'https://channels.weixin.qq.com/cgi-bin/mmfinderassistant-bin/auth/auth_data');
+  assert(f.states.some(s => s.errorCode === 'PLATFORM_ACCOUNT_CHANGED'));
+  await f.collector.stop();
+  assert.equal(shared.clearCount, 0);
+  assert.equal(shared.listenerCount('will-download'), 0);
+  assert.deepEqual(f.credentialCalls, []);
+});
 
 function setCompleteLogin(session) {
   session.cookies.items = [{ name: 'local-auth', value: 'private-local-cookie', domain: '.weixin.qq.com', path: '/', httpOnly: true }];
@@ -793,6 +836,50 @@ async function startResponse(f, requestId, endpoint, liveId = 'fixture-live-room
 async function finishResponse(f, requestId, encodedDataLength = 100) {
   await f.collector.networkMessage(f.collector.run, 'Network.loadingFinished', { requestId, encodedDataLength });
 }
+
+test('同批次前后顺序均补齐视频号名称，普通评论不会被猜测成礼物', async () => {
+  for (const reverse of [false, true]) {
+    const value = giftNameSample(); if (reverse) value.data.appMsgList.reverse();
+    value.data.msgList = [{ type: 1, clientMsgId: 'comment-only', content: '送出合成如意花' }];
+    const f = browserFixture({ messageResponse: () => value }); await f.connect({ remember: false });
+    await startResponse(f, 'batch', url); await finishResponse(f, 'batch');
+    const gifts = f.events.filter(row => row.event.event_type === 'gift');
+    assert.equal(gifts.length, 1); assert.equal(gifts[0].event.gift_name, '合成如意花');
+    assert.equal(gifts[0].event.gift_count, 1); assert.equal(gifts[0].event.gift_price_raw, '5');
+    assert.equal(f.collector.run.pendingGifts.size, 0);
+    await f.collector.stop();
+  }
+});
+
+test('后续轮询名称只补原房间待发礼物，重复累计通知不重复计数，停止取消待发', async () => {
+  const f = browserFixture({ messageResponse: ({ requestId }) => giftNameSample({
+    receipt: requestId === 'paid', combo: requestId !== 'paid', roomId: requestId === 'wrong' ? 'other-room' : 'fixture-live-room'
+  }) });
+  await f.connect({ remember: false });
+  await startResponse(f, 'paid', url); await finishResponse(f, 'paid');
+  assert.equal(f.events.length, 0); assert.equal(f.collector.run.pendingGifts.size, 1);
+  await startResponse(f, 'wrong', url, 'other-room'); await finishResponse(f, 'wrong');
+  assert.equal(f.events.length, 0);
+  await startResponse(f, 'details', url); await finishResponse(f, 'details');
+  await startResponse(f, 'duplicate-details', url); await finishResponse(f, 'duplicate-details');
+  assert.equal(f.events.length, 1); assert.equal(f.events[0].event.gift_name, '合成如意花');
+  assert.equal(f.events[0].event.source_msg_id, 'synthetic-paid-1');
+  const run = f.collector.run;
+  f.collector.dispatchEvent(run, { event_type: 'gift', gift_id: 'missing', gift_count: 1 }, 'fixture-live-room');
+  assert.equal(run.pendingGifts.size, 1); await f.collector.stop();
+  assert.equal(run.pendingGifts.size, 0); assert.equal(run.giftCatalog.details.size, 0);
+});
+
+test('缺少元数据最多等待3秒，队列满提前输出且不丢失实收事件', async () => {
+  const f = browserFixture(); await f.connect({ remember: false }); const run = f.collector.run;
+  for (let i = 0; i < 129; i++) f.collector.dispatchEvent(run,
+    { event_type: 'gift', gift_id: 'missing', source_msg_id: `paid-${i}`, gift_count: 1 }, 'fixture-live-room');
+  assert.equal(run.pendingGifts.size, 128); assert.equal(f.events.length, 1);
+  await new Promise(resolve => setTimeout(resolve, 3100));
+  assert.equal(run.pendingGifts.size, 0); assert.equal(f.events.length, 129);
+  assert.equal(new Set(f.events.map(row => row.event.source_msg_id)).size, 129);
+  await f.collector.stop();
+});
 
 test('被动目录接入补齐真实礼物增量图片，目录本身不产生互动或连接状态', async () => {
   const f = browserFixture({ messageResponse: ({ requestId }) => requestId === 'catalog' ? syntheticGiftCatalog() : sample() });

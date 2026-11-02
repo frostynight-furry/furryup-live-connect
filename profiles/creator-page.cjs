@@ -12,7 +12,7 @@ const PLATFORMS = Object.freeze({
   bilibili: { url: 'https://member.bilibili.com/platform/home', hosts: ['member.bilibili.com', 'passport.bilibili.com', 'account.bilibili.com', 'www.bilibili.com'], name: 'B站' },
   douyin: { url: 'https://creator.douyin.com/creator-micro/home', hosts: ['creator.douyin.com', 'www.douyin.com', 'sso.douyin.com'], name: '抖音' },
   kuaishou: { url: 'https://cp.kuaishou.com/profile', loginUrl: kuaishouLogin.href, hosts: ['cp.kuaishou.com', 'passport.kuaishou.com'], name: '快手' },
-  wechat_channels: { url: 'https://channels.weixin.qq.com/platform', hosts: ['channels.weixin.qq.com', 'open.weixin.qq.com'], name: '视频号' },
+  wechat_channels: { url: 'https://channels.weixin.qq.com/platform', loginUrl: 'https://channels.weixin.qq.com/login.html', hosts: ['channels.weixin.qq.com', 'open.weixin.qq.com'], name: '视频号' },
   xiaohongshu: { url: 'https://creator.xiaohongshu.com/new/home', hosts: ['creator.xiaohongshu.com', 'customer.xiaohongshu.com'], name: '小红书' }
 });
 function allowedNavigation(platform, address) {
@@ -51,6 +51,11 @@ function identityResponseKind(platform, address) {
   if (platform === 'kuaishou' && u.hostname === 'cp.kuaishou.com' && p === '/rest/v2/creator/pc/authority/account/current') return 'ks-self';
   if (platform === 'kuaishou' && u.hostname === 'cp.kuaishou.com' && p === '/rest/cp/creator/pc/home/userInfo') return 'ks-stats';
   return null;
+}
+function identityFailureFromResponse(kind, body) {
+  // Observed official auth_data rejection followed by login.html. Do not infer
+  // session expiry from arbitrary error codes or responses on other endpoints.
+  return kind === 'finder' && body?.errCode === 300333 ? 'LOGIN_REQUIRED' : '';
 }
 function identityFromResponse(kind, body) {
   if (!body || typeof body !== 'object') return null;
@@ -117,7 +122,7 @@ function readCreatorPage(platform) {
   }
   // Handles are obtained only from the creator's account header/card, never a
   // follower list or an arbitrary profile link elsewhere on the page.
-  const scopes = { bilibili: '.header-entry-mini, .user-info', douyin: '[class*="user-info"], [class*="account-info"], [class*="userInfo"]',
+  const scopes = { bilibili: '.header-entry-mini, .user-info', douyin: '[class*="user-info"], [class*="account-info"], [class*="userInfo"], main.creator-home-redesign [class*="header-"] > [class*="unique_id-"]',
     kuaishou: '.header-info-card, .user-info-dpd, .profile-info', wechat_channels: '.finder-content-info', xiaohongshu: '.user-info, .account-info, .personal-info' };
   const patterns = { bilibili: /(?:UID)\s*[:：]?\s*([1-9]\d{0,19})/i, douyin: /抖音号\s*[:：]?\s*([A-Za-z0-9_.-]{1,128})/,
     kuaishou: /快手号\s*[:：]?\s*([A-Za-z0-9_.-]{1,128})/, xiaohongshu: /小红书号\s*[:：]?\s*([A-Za-z0-9_.-]{1,128})/ };
@@ -126,8 +131,8 @@ function readCreatorPage(platform) {
   const names = { bilibili: '.nickname, .user-name', douyin: '[class*="name-"]', kuaishou: '.user-info-name, .header-info-card .user-name', wechat_channels: '.finder-nickname, .finder-name', xiaohongshu: '.user-name, .nickname' };
   const body = (document.body?.innerText || '').slice(0, 12000);
   const challenge = /请完成安全验证|拖动滑块|安全验证|请先完成身份验证|验证码错误|verify you are human/i.test(body);
-  const login = /\/login(?:[/?#]|$)|\/passport(?:[/?#]|$)/i.test(location.href) || (!results.length && /扫码登录|短信登录|请先登录|立即登录|微信扫码|Sign in to/i.test(body));
+  const login = /\/(?:login|passport)(?:\.html?|\/|$)/i.test(new URL(location.href).pathname) || (!results.length && /扫码登录|短信登录|请先登录|立即登录|微信扫码|Sign in to/i.test(body));
   return { counts: results.slice(0, 10), handle: uniqueIdentities.length === 1 ? uniqueIdentities[0] : '',
     displayName: text(all(names[platform])[0]).slice(0, 80), challenge, login };
 }
-module.exports = { PLATFORMS, allowedNavigation, parseCount, cleanIdentity, identityResponseKind, identityFromResponse, readCreatorPage };
+module.exports = { PLATFORMS, allowedNavigation, parseCount, cleanIdentity, identityResponseKind, identityFromResponse, identityFailureFromResponse, readCreatorPage };

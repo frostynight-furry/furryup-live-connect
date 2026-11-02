@@ -1,6 +1,6 @@
 // Copyright (c) 2026 FrostyNight. See LICENSE.
 'use strict';
-const { fault, binding, timestamp, month, monthRange, monthEnd, shiftMonth, chinaDay, label, minor, record } = require('./model.cjs');
+const { fault, binding, timestamp, month, monthRange, monthEnd, shiftMonth, chinaDay, label, minor, record, metric, metricKey } = require('./model.cjs');
 const WECHAT_REVENUE_PAGE = 'https://channels.weixin.qq.com/platform/income';
 const WECHAT_WALLET_ORIGIN = 'https://qy.webeans.weixin.qq.com';
 const paths = { identity: 'auth/auth_data', catalog: 'income/get-my-finder-income-detail',
@@ -19,6 +19,10 @@ function unwrapWechat(body) {
 function walletHandoff(data) {
   // Studio/company choices are intentionally not inferred from another business account.
   const info = data.cocertInfo;
+  // Observed successful empty response: no settlement credential was supplied.
+  // This is not a malformed bill or evidence that earnings are zero.
+  if (info?.auditStatus === 0 && Array.isArray(info.incomeItems) && !info.incomeItems.length &&
+      info.wecoinAuthCode === undefined && info.settleType === undefined) throw fault('REVENUE_SETTLEMENT_ENTRY_UNAVAILABLE');
   if (!info || typeof info.wecoinAuthCode !== 'string' || !info.wecoinAuthCode || info.wecoinAuthCode.length > 4096) throw fault('REVENUE_WALLET_HANDOFF_UNAVAILABLE');
   if (![1, 2].includes(info.settleType)) throw fault('REVENUE_WALLET_HANDOFF_UNAVAILABLE');
   if (info.settleType === 2 && !info.extInfo?.maskPhone) throw fault('REVENUE_ADDITIONAL_VERIFICATION_REQUIRED');
@@ -30,6 +34,28 @@ function walletRequest() {
 }
 const businesses = { 1: ['live_gifts', '直播礼物', 'live'], 3: ['live_team', '付费组队', 'live'], 7: ['live_paid', '付费直播', 'live'],
   13: ['membership', '视频号会员', 'other'], 16: ['paid_course', '付费课程', 'other'], 18: ['paid_drama', '付费剧集', 'other'] };
+// The same authenticated catalog includes amounts, not just entry permissions.
+// The official catalog reports integer CNY cents for account-level observations.
+const catalogCategories = { 7: ['live', '直播收入'], 6: ['video_incentive', '创作分成计划'],
+  3: ['video_tasks', '视频变现任务'], 5: ['paid_collection', '付费合集'] };
+function catalogMetrics(items, fetchedAt) {
+  const result = [], seen = new Set();
+  for (const item of items) {
+    if (item.permission !== true || !Object.hasOwn(catalogCategories, item.incomeType)) continue;
+    if (item.wordingInfos === undefined) continue;
+    if (!Array.isArray(item.wordingInfos) || item.wordingInfos.length > 20) throw fault('REVENUE_SCHEMA_CHANGED');
+    const [categoryId, categoryName] = catalogCategories[item.incomeType];
+    for (const entry of item.wordingInfos) {
+      if (!['可提现收入', '累计收入'].includes(entry?.wording)) continue;
+      if (typeof entry.number !== 'string' || !/^(?:0|[1-9]\d{0,17})$/.test(entry.number)) throw fault('REVENUE_SCHEMA_CHANGED');
+      const balance = entry.wording === '可提现收入';
+      const row = metric({ scope: 'wechat_channels.catalog', categoryId, categoryName, metric: balance ? 'balance' : 'income',
+        period: balance ? 'current' : 'lifetime', amountMinor: entry.number, provisional: false }, fetchedAt);
+      const key = metricKey(row); if (seen.has(key)) throw fault('CONFLICTING_REVENUE_PERIOD'); seen.add(key); result.push(row);
+    }
+  }
+  return result;
+}
 function parseWechatWallet(body, { fetchedAt, requestedMonths }) {
   if (body?.error) throw fault([-2, -1000001].includes(body.error.code) ? 'REVENUE_WALLET_LOGIN_REQUIRED' : 'REVENUE_PLATFORM_REJECTED');
   const data = body?.data;
@@ -60,13 +86,13 @@ async function collectWechatRevenue({ accountId, identityKind, request, readWall
   if ((fromMonth === undefined) !== (toMonth === undefined)) throw fault('INVALID_REVENUE_RANGE');
   const current = chinaDay(Math.floor(Date.parse(fetchedAt) / 1000)).slice(0, 7);
   const requestedMonths = monthRange(fromMonth || shiftMonth(current, -6), toMonth || current);
-  const records = [], issues = [], categories = [], availability = [];
+  const records = [], metrics = [], issues = [], categories = [], availability = [];
   const fatal = new Set(['ACCOUNT_CHANGED', 'PLATFORM_ACCOUNT_CHANGED', 'LOGIN_REQUIRED', 'VERIFICATION_REQUIRED', 'LOGIN_CANCELLED', 'REVENUE_DISPOSED', 'UNTRUSTED_PAGE', 'PAGE_CHANGED']);
   async function read(source, operation) {
     try { return await operation(); }
     catch (error) {
       if (fatal.has(error.code)) throw error;
-      const known = ['REVENUE_PLATFORM_REJECTED', 'REVENUE_NETWORK_ERROR', 'REVENUE_RESPONSE_TOO_LARGE', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_HTTP_ERROR', 'REVENUE_WALLET_HANDOFF_UNAVAILABLE', 'REVENUE_ADDITIONAL_VERIFICATION_REQUIRED', 'REVENUE_WALLET_LOGIN_REQUIRED', 'REVENUE_WALLET_TIMEOUT', 'REVENUE_CATEGORY_ENDPOINT_UNSUPPORTED', 'REVENUE_SUBCENT_PRECISION', 'CONFLICTING_REVENUE_PERIOD'];
+      const known = ['REVENUE_PLATFORM_REJECTED', 'REVENUE_NETWORK_ERROR', 'REVENUE_RESPONSE_TOO_LARGE', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_HTTP_ERROR', 'REVENUE_WALLET_HANDOFF_UNAVAILABLE', 'REVENUE_SETTLEMENT_ENTRY_UNAVAILABLE', 'REVENUE_ADDITIONAL_VERIFICATION_REQUIRED', 'REVENUE_WALLET_LOGIN_REQUIRED', 'REVENUE_WALLET_TIMEOUT', 'REVENUE_CATEGORY_ENDPOINT_UNSUPPORTED', 'REVENUE_SUBCENT_PRECISION', 'CONFLICTING_REVENUE_PERIOD'];
       issues.push({ code: known.includes(error.code) ? error.code : 'REVENUE_SCHEMA_CHANGED', source }); return null;
     }
   }
@@ -74,12 +100,17 @@ async function collectWechatRevenue({ accountId, identityKind, request, readWall
     const data = unwrapWechat(await request(wechatRequest('catalog')));
     if (!Array.isArray(data.incomeDetails) || data.incomeDetails.length > 100) throw fault('REVENUE_SCHEMA_CHANGED');
     const pending = data.incomeDetails.map(item => {
-      if (typeof item.permission !== 'boolean' || typeof item.card?.title !== 'string') throw fault('REVENUE_SCHEMA_CHANGED');
-      return { name: label(item.card.title), enabled: item.permission, acquisition: 'mobile_page' };
+      // Enabled entries have incomeTitle and need not contain an upsell card.
+      // Disabled protobuf entries can omit the false permission field.
+      const title = item.incomeTitle || item.card?.title;
+      if (item.permission !== undefined && typeof item.permission !== 'boolean' || typeof title !== 'string' || !title.trim()) throw fault('REVENUE_SCHEMA_CHANGED');
+      return { name: label(title), enabled: item.permission === true, acquisition: 'mobile_page' };
     });
-    availability.push(...pending);
+    const amounts = catalogMetrics(data.incomeDetails, fetchedAt);
+    availability.push(...pending); metrics.push(...amounts);
   });
-  // This desktop endpoint returns eligibility/cards and QR instructions, not revenue amounts.
+  // The catalog provides current balances/lifetime totals; daily video earnings
+  // still require a separate official mobile session, not the business wallet.
   issues.push({ code: 'REVENUE_VIDEO_INCENTIVE_MOBILE_REQUIRED', source: 'wechat_channels.video_incentive' });
   await read('wechat_channels.live_settlement', async () => {
     const data = unwrapWechat(await request(wechatRequest('handoff'))), url = walletHandoff(data);
@@ -92,7 +123,7 @@ async function collectWechatRevenue({ accountId, identityKind, request, readWall
   });
   issues.push({ code: 'REVENUE_HISTORY_PLATFORM_VISIBLE_ONLY', source: 'wechat_channels.live_settlement' });
   return { schemaVersion: 1, platform: 'wechat_channels', accountId, ...(identityKind ? { identityKind } : {}), fetchedAt,
-    source: 'creator_center', currency: 'CNY', timeZone: 'Asia/Shanghai', requestedMonths, records, metrics: [], categories, availability,
-    issues, status: records.length ? 'partial' : 'unavailable', historyComplete: false, adapterValidation: 'synthetic_only' };
+    source: 'creator_center', currency: 'CNY', timeZone: 'Asia/Shanghai', requestedMonths, records, metrics, categories, availability,
+    issues, status: records.length || metrics.length ? 'partial' : 'unavailable', historyComplete: false, adapterValidation: 'catalog_live_verified' };
 }
-module.exports = { WECHAT_REVENUE_PAGE, WECHAT_WALLET_ORIGIN, wechatRequest, unwrapWechat, walletHandoff, walletRequest, parseWechatWallet, collectWechatRevenue };
+module.exports = { WECHAT_REVENUE_PAGE, WECHAT_WALLET_ORIGIN, wechatRequest, unwrapWechat, walletHandoff, walletRequest, parseWechatWallet, catalogMetrics, collectWechatRevenue };

@@ -26,7 +26,7 @@ function requestFor(platform, kind, params = {}) {
   const query = {};
   if (platform === 'bilibili') {
     if (kind === 'trend') query.days = '30';
-    if (kind === 'monthly') query.current_month = month(params.month).replace('-', '');
+    if (kind === 'monthly' && params.month !== undefined) query.current_month = month(params.month).replace('-', '');
   } else {
     query.income_type = '0'; // Only the signed-in personal account, never an agency talent ID.
     if (kind !== 'categories') {
@@ -105,7 +105,7 @@ async function collectCreatorRevenue({ platform, accountId, identityKind, ownUse
       return value;
     } catch (error) {
       if (fatalCodes.has(error.code)) throw error;
-      const code = ['REVENUE_PLATFORM_REJECTED', 'REVENUE_NETWORK_ERROR', 'REVENUE_RESPONSE_TOO_LARGE', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_HTTP_ERROR', 'REVENUE_MONTH_UNAVAILABLE', 'REVENUE_MONTH_MISMATCH', 'CONFLICTING_REVENUE_PERIOD'].includes(error.code) ? error.code : 'REVENUE_SCHEMA_CHANGED';
+      const code = ['REVENUE_PLATFORM_REJECTED', 'REVENUE_NETWORK_ERROR', 'REVENUE_RESPONSE_TOO_LARGE', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_HTTP_ERROR', 'REVENUE_MONTH_UNAVAILABLE', 'REVENUE_MONTH_MISMATCH', 'REVENUE_DATA_NOT_READY', 'CONFLICTING_REVENUE_PERIOD'].includes(error.code) ? error.code : 'REVENUE_SCHEMA_CHANGED';
       issues.push({ code, source: platform + '.' + kind, ...(params?.month ? { month: params.month } : {}), ...(params?.categoryId ? { categoryId: params.categoryId } : {}) });
       return null;
     }
@@ -136,9 +136,19 @@ async function collectCreatorRevenue({ platform, accountId, identityKind, ownUse
       return add({ scope: 'bilibili.trend', categoryId: 'total', categoryName: '收益趋势（平台所含项目）', period: 'day', start: date, end: date, amountMinor: minor(item.amt) });
     }) }));
     const oldest = shiftMonth(current, -6);
+    // Without current_month the official endpoint identifies its latest report.
+    // It silently falls back to that report when a newer month is unpublished.
+    // Probe the latest period first; older unexpected mismatches still fail closed.
+    const latest = await read('monthly', {}, data => {
+      if (data?.is_normal_show !== true && data?.is_normal_show !== 1) return null;
+      const latestMonth = reportMonth(data.income_market?.current_month);
+      if (latestMonth >= current) throw fault('REVENUE_MONTH_MISMATCH');
+      return { month: latestMonth };
+    });
     for (const value of requestedMonths) {
-      if (value < oldest || value >= current) {
-        issues.push({ code: value >= current ? 'REVENUE_MONTH_NOT_PUBLISHED' : 'REVENUE_HISTORY_OUTSIDE_WINDOW', source: 'bilibili.monthly', month: value });
+      if (value < oldest || value >= current || latest && value > latest.month) {
+        issues.push({ code: value >= current || latest && value > latest.month ? 'REVENUE_MONTH_NOT_PUBLISHED' : 'REVENUE_HISTORY_OUTSIDE_WINDOW', source: 'bilibili.monthly', month: value,
+          ...(latest && value > latest.month ? { latestAvailableMonth: latest.month } : {}) });
         continue;
       }
       await read('monthly', { month: value }, data => {
@@ -182,17 +192,21 @@ async function collectCreatorRevenue({ platform, accountId, identityKind, ownUse
         issues.push({ code: 'REVENUE_CATEGORY_ENDPOINT_UNSUPPORTED', source: 'douyin.detail', categoryId: id }); continue;
       }
       await read('summary', { categoryId: target.id }, data => {
-        const rows = [];
+        const rows = []; let waiting = false;
         for (const [field, period] of [['day1_income_summary', 'previous_day'], ['day7_income_summary', 'rolling_7_days'], ['day30_income_summary', 'rolling_30_days'], ['total_income_summary', 'lifetime']]) {
           const value = data[field];
           // The UI hides lifetime for the all-category and Xingtu tabs.
           if (period === 'lifetime' && ['', 'business_task_xingtu'].includes(target.id)) continue;
-          if (!value || value.history_total_income == null || value.data_update_status === 0) continue;
+          if (!value || value.history_total_income == null) continue;
+          // A valid pending summary is neither a malformed response nor zero income.
+          minor(value.history_total_income);
+          if (![0, 1, 2].includes(value.data_update_status)) throw fault('REVENUE_SCHEMA_CHANGED');
+          if (value.data_update_status === 0) { waiting = true; continue; }
           rows.push({ scope: 'douyin.category', categoryId: id, metric: 'income', period,
             amountMinor: minor(value.history_total_income), currency: 'CNY', provisional: true,
             updateStatus: value.data_update_status === 2 ? 'updated' : 'updating' });
         }
-        if (!rows.length) throw fault('REVENUE_SCHEMA_CHANGED');
+        if (!rows.length) throw fault(waiting ? 'REVENUE_DATA_NOT_READY' : 'REVENUE_SCHEMA_CHANGED');
         return { metrics: rows };
       });
       await read('detail', { categoryId: target.id }, data => ({ records: array(data.income_item_list).map(item => {

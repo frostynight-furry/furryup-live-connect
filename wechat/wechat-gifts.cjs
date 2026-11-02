@@ -59,13 +59,15 @@ class WechatGiftCatalog {
   constructor({ now = Date.now, ttlMs = 30 * 60_000, maxRooms = 8, maxEntries = 512 } = {}) {
     this.now = now; this.ttlMs = limit(ttlMs, 30 * 60_000, 30 * 60_000);
     this.maxRooms = limit(maxRooms, 8, 8); this.maxEntries = limit(maxEntries, 512, 512);
-    this.rooms = new Map();
+    this.rooms = new Map(); this.details = new Map();
   }
   prune() {
     const now = this.now();
     // Keep the small ordering watermark until capacity eviction so a delayed
     // response cannot refresh an already expired older catalogue.
     for (const snapshot of this.rooms.values()) if (snapshot.expiresAt <= now) snapshot.gifts.clear();
+    for (const entries of this.details.values()) for (const entry of entries.values())
+      if (entry.expiresAt <= now) { delete entry.gift_name; delete entry.gift_image_url; }
   }
   ingest(body, request) {
     const decoded = decodeWechatGiftCatalog(body, request);
@@ -81,12 +83,46 @@ class WechatGiftCatalog {
   }
   enrich(event, roomId) {
     this.prune();
-    if (event?.event_type !== 'gift' || event.gift_image_url) return event;
-    const image = this.rooms.get(metadataRoomId(roomId))?.gifts.get(exactId(event.gift_id));
-    // Only attach an image. Names, quantities, prices and message identities
-    // always retain the original event's meaning. Never match by display name.
-    return image ? { ...event, gift_image_url: image } : event;
+    if (event?.event_type !== 'gift') return event;
+    const room = metadataRoomId(roomId), id = exactId(event.gift_id);
+    const details = this.details.get(room)?.get(id);
+    const name = typeof event.gift_name === 'string' && event.gift_name.trim() ? '' : details?.gift_name;
+    const image = event.gift_image_url ? '' : details?.gift_image_url || this.rooms.get(room)?.gifts.get(id);
+    // Fill missing display metadata by exact room/product ID only. Never change
+    // quantities, prices or identities; never match a nickname or display text.
+    return name || image ? { ...event, ...(name && { gift_name: name }), ...(image && { gift_image_url: image }) } : event;
   }
-  clear() { this.rooms.clear(); }
+  ingestDetails(items, roomId, order) {
+    const room = metadataRoomId(roomId);
+    if (!room || !Number.isSafeInteger(order) || order < 0 || !Array.isArray(items)) return;
+    this.prune();
+    const batch = new Map(), conflicts = new Set();
+    for (const item of items.slice(0, 2000)) {
+      const id = exactId(item?.gift_id);
+      const name = typeof item?.gift_name === 'string' ? item.gift_name.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 100) : '';
+      const image = avatarInfo(item?.gift_image_url, 'wechat').avatar_url || '';
+      if (!id || (!name && !image) || conflicts.has(id)) continue;
+      const prior = batch.get(id);
+      if (prior && ((name && prior.gift_name && name !== prior.gift_name) ||
+          (image && prior.gift_image_url && image !== prior.gift_image_url))) {
+        batch.delete(id); conflicts.add(id); continue;
+      }
+      batch.set(id, { ...prior, ...(name && { gift_name: name }), ...(image && { gift_image_url: image }) });
+    }
+    if (!batch.size && !conflicts.size) return;
+    const entries = this.details.get(room) || new Map();
+    for (const id of conflicts) if ((entries.get(id)?.order ?? -1) <= order)
+      entries.set(id, { order, expiresAt: this.now() + this.ttlMs });
+    for (const [id, item] of batch) {
+      const previous = entries.get(id);
+      if (previous && previous.order >= order) continue;
+      entries.delete(id);
+      entries.set(id, { ...previous, ...item, order, expiresAt: this.now() + this.ttlMs });
+    }
+    while (entries.size > this.maxEntries) entries.delete(entries.keys().next().value);
+    this.details.delete(room); this.details.set(room, entries);
+    while (this.details.size > this.maxRooms) this.details.delete(this.details.keys().next().value);
+  }
+  clear() { this.rooms.clear(); this.details.clear(); }
 }
 module.exports = { isGiftCatalogUrl, metadataRoomId, decodeWechatGiftCatalog, WechatGiftCatalog, MAX_CATALOG_ITEMS };

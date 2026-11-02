@@ -20,9 +20,12 @@ function walletRequest({ month: selected, page = 1, cursor } = {}) {
     count: '20', type: '0', need_summary: '1', is_income_record: '1' }).toString();
   return { url: url.href, source: 'douyin.wallet', method: 'GET' };
 }
-function unwrap(body) {
+function unwrap(body, web) {
   if (!body || typeof body.status_code !== 'number') throw fault('REVENUE_SCHEMA_CHANGED');
   if (body.status_code === 20003) throw fault('REVENUE_WALLET_SESSION_REQUIRED');
+  // A parameter/context rejection is not evidence that the platform has no
+  // wallet data or categorically forbids every web integration.
+  if (web && body.status_code === 10011 && body.data?.message === 'Request params error') throw fault('REVENUE_WALLET_REQUEST_CONTEXT_REQUIRED');
   if (body.status_code !== 0) throw fault('REVENUE_PLATFORM_REJECTED');
   const data = body.data;
   if (!data || !Array.isArray(data.bill_list) || data.bill_list.length > 24 || ![true, false, 0, 1].includes(data.has_more) ||
@@ -77,7 +80,7 @@ async function collectDouyinWalletRevenue({ accountId, identityKind, request, fr
   async function readMonth(selected) {
     const seen = new Map(); let cursor = now, summary, typesSignature, complete = false;
     for (let page = 1; page <= maxPagesPerMonth; page++) {
-      const data = unwrap(await request(walletRequest({ month: selected, page, cursor })));
+      const data = unwrap(await request(walletRequest({ month: selected, page, cursor })), identityKind !== 'native_uid');
       const earliest = compactMonth(data.end_time);
       if (earliest > current || earliestAvailableMonth && earliest !== earliestAvailableMonth) throw fault('REVENUE_WALLET_SNAPSHOT_CHANGED');
       earliestAvailableMonth = earliest;
@@ -120,7 +123,7 @@ async function collectDouyinWalletRevenue({ accountId, identityKind, request, fr
     try { await readMonth(selected); }
     catch (error) {
       if (fatal.has(error.code)) throw error;
-      const known = new Set(['REVENUE_PLATFORM_REJECTED', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_NETWORK_ERROR', 'REVENUE_HTTP_ERROR', 'REVENUE_RESPONSE_TOO_LARGE',
+      const known = new Set(['REVENUE_WALLET_WEB_UNAVAILABLE', 'REVENUE_WALLET_REQUEST_CONTEXT_REQUIRED', 'REVENUE_PLATFORM_REJECTED', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_NETWORK_ERROR', 'REVENUE_HTTP_ERROR', 'REVENUE_RESPONSE_TOO_LARGE',
         'REVENUE_HISTORY_OUTSIDE_WINDOW', 'REVENUE_WALLET_SNAPSHOT_CHANGED', 'REVENUE_MONTH_MISMATCH', 'REVENUE_DATE_OUTSIDE_RANGE', 'CONFLICTING_REVENUE_TRANSACTION', 'REVENUE_PAGINATION_INCOMPLETE', 'REVENUE_WALLET_RECONCILIATION_FAILED']);
       issues.push({ code: known.has(error.code) ? error.code : 'REVENUE_SCHEMA_CHANGED', source: 'douyin.wallet', month: selected });
     }

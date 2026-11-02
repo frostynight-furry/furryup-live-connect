@@ -58,6 +58,10 @@ The Douyin pair-score adapter independently reads the wire fields and UPDATE dis
 
 ## Downloaded build/runtime dependencies
 
+### Bilibili audience robustness (0.8.2)
+
+This adaptation reuses the existing MIT OrdinaryRoad 1.5.8 decoder and Netty transport. Its codec's `ONLINE_RANK_COUNT.online_count` field was cross-checked with the [message author's protocol reference](https://github.com/pskdje/bilibili_live_message_stream/blob/d487dc3f1a61bc810e8ac4e40e4e9e55b175f959/docs/cmd/ONLINE_RANK_COUNT.md). The adapter is independently authored and preserves exact integers and field absence; no reference repository code or live messages are copied. Bounded transport notifications are liveness metadata, never viewer counts. A host may tag independently verified HTTP `onlineNum` snapshots as `bilibili-online-snapshot-api`; the core does not make those HTTP requests or treat rank list length/popularity as audience. The old unverified `bilibili-online-rank-api` tag remains distinct. No new dependency is added.
+
 Maven and npm resolve transitive dependencies separately under their respective licenses. Electron is used only as a development/runtime dependency for the example. Consult dependency POMs and the JAR `META-INF` license/notice files and Electron notices before redistributing any binaries. No Java runtime, source archive, or dependency binary is distributed by this source repository.
 
 ## Multiple sender badges (0.7.0)

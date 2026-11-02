@@ -74,9 +74,9 @@ On Windows use drive-qualified absolute paths and quote an entire `--adb=...` or
 
 ## Remaining WeChat video incentive gap
 
-The [official desktop income card](https://res.wx.qq.com/t/wx_fed/finder/helper/content/finder-helper-content/res/static/js/async/880.4945ce38.js) links to `https://channels.weixin.qq.com/assistant-support/pages/creator-home/income` with the authenticated creator identifier. This is not a verified amount API. An unauthenticated visit returns page-validation failure. [Official Tencent Ads guidance](https://training.tencentads.com/uploads/202406/lUKWuerT_DtCfUk.pdf) shows mobile creator-center advertising income / revenue sharing, without a reusable statement API contract.
+The official Channels catalog returns account-level lifetime income and withdrawable balances in CNY cents. The ledger stores these under `wechat_channels.catalog` as `income/lifetime` and `balance/current`. Daily and monthly video incentive details require mobile verification. Live monthly bills also require an initialized settlement subject. Unavailable months remain missing.
 
-No guessed amount endpoint, private WeChat database reader or membership-income substitute has been added. Shared four-platform scheduling and history persistence are implemented; automatic WeChat video incentive collection still needs the real mobile entry, identity and monthly response shape. Inspect those while the owner opens the relevant page, then implement the adapter and independent synthetic fixtures. Existing WeChat live settlement collection is separate; see the [source matrix](CREATOR_REVENUE.en.md).
+The Android connector targets the official Douyin wallet. Channels catalog metrics, eligible settlement statements and canonical imports use separate readers. [Revenue sources](CREATOR_REVENUE.en.md)
 
 ## Device acceptance
 

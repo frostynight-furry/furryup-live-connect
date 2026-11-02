@@ -2,7 +2,7 @@
 
 [中文](REVENUE_SYNC.md) · [Revenue sources](CREATOR_REVENUE.en.md) · [Android wallet](ANDROID_REVENUE.en.md)
 
-`createCreatorRevenueSync` connects the existing four-platform readers to one scheduler with monthly checkpoints and persistence. Synthetic tests and Electron flows are verified; real revenue accounts are not. Sync can only preserve data available through an authorized platform session. WeChat Channels video incentives still lack a verified amount endpoint, and Douyin Android wallet authentication requires device acceptance.
+`createCreatorRevenueSync` schedules authorized readers for four platforms and persists source state and monthly checkpoints across restarts.
 
 ## Collection windows
 
@@ -12,11 +12,11 @@
 | Douyin creator center / anchor dashboard | Recent 30-day details and available summaries; saved daily data accumulates into months | Details already outside the window before first sync; native units are never converted to CNY |
 | Douyin wallet | Recent three months and per-month history back to the server's earliest month | Valid wallet session required; mixed labels cannot be split into video/live; posting-month basis |
 | Kuaishou | Recent three months of personal incentive bills and daily live gift analytics; bounded backfill to 2019-04 or configured start | Incentive selector starts at 2019-08; one supported incentive program; a selectable date does not guarantee access |
-| WeChat Channels | All visible primary-settlement-subject bills, filtered to the requested range, including new and corrected months | Additional subjects, unreturned history, mobile-verification sessions and video incentive amount endpoint |
+| WeChat Channels | Available primary-subject monthly bills and separate account metrics | Additional settlement subjects, unavailable months and mobile-only details |
 
 Default refresh is every six hours. Kuaishou and wallet backfill continues every 60 seconds, attempting at most six months per batch. Older checked months are rechecked after 30 days by default. Bilibili, Douyin rolling pages and the WeChat settlement page each read their supported window once per scheduled run. `fromMonth` narrows the window.
 
-WeChat video incentives explicitly report `REVENUE_VIDEO_INCENTIVE_MOBILE_REQUIRED`. Membership, courses, drama or live receipts cannot substitute for them. Verified official monthly totals can be imported with the existing normalized CSV format in a separate `statement.video` scope. Imported history is queryable and persistent, but is not automatic collection.
+The official Channels catalog returns account-level lifetime income and withdrawable balances in CNY cents. The ledger stores these under `wechat_channels.catalog` as `income/lifetime` and `balance/current`. Daily and monthly video incentive details require mobile verification. Live monthly bills also require an initialized settlement subject. Unavailable months remain missing.
 
 ## Electron integration
 

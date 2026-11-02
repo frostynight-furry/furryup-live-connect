@@ -1,6 +1,6 @@
 // Copyright (c) 2026 FrostyNight. See LICENSE.
 'use strict';
-const { fault, binding, timestamp, day, month, monthEnd, monthRange, shiftMonth, chinaDay, decimal, yuanToMinor, minor, record } = require('./model.cjs');
+const { fault, binding, timestamp, day, month, monthEnd, monthRange, shiftMonth, chinaDay, decimal, yuanToMinor, roundedYuanToMinor, minor, record } = require('./model.cjs');
 const KUAISHOU_PAGE = 'https://cp.kuaishou.com/profile';
 const paths = {
   identity: '/rest/v2/creator/pc/authority/account/current',
@@ -44,6 +44,15 @@ function dateValue(value) {
   if (Number.isSafeInteger(value) && value >= 946656000000 && value < 4102444800000) return chinaDay(Math.floor(value / 1000));
   throw fault('REVENUE_DATE_UNAVAILABLE');
 }
+function analysisYuan(value) {
+  if (typeof value !== 'number') return decimal(value);
+  if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER / 1000000) throw fault('INVALID_REVENUE_AMOUNT');
+  const normalized = value.toFixed(6);
+  // Remove only IEEE-754 representation noise, such as 0.1 + 0.2.
+  // Genuine precision beyond six decimals must not be silently truncated.
+  if (Math.abs(Number(normalized) - value) > Number.EPSILON * Math.max(1, Math.abs(value)) * 4) throw fault('REVENUE_SUBCENT_PRECISION');
+  return decimal(normalized);
+}
 async function collectKuaishouRevenue({ accountId, identityKind, ownUserId, request, fromMonth, toMonth, fetchedAt = new Date().toISOString() } = {}) {
   binding('kuaishou', accountId); timestamp(fetchedAt); selfId(ownUserId);
   if (typeof request !== 'function') throw new TypeError('Revenue transport is required');
@@ -57,7 +66,7 @@ async function collectKuaishouRevenue({ accountId, identityKind, ownUserId, requ
     try { records.push(...await collect()); }
     catch (error) {
       if (fatal.has(error.code)) throw error;
-      const known = ['REVENUE_PLATFORM_REJECTED', 'REVENUE_NETWORK_ERROR', 'REVENUE_RESPONSE_TOO_LARGE', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_HTTP_ERROR', 'REVENUE_MONTH_UNAVAILABLE', 'REVENUE_MONTH_MISMATCH', 'REVENUE_DATE_UNAVAILABLE', 'REVENUE_DATE_OUTSIDE_RANGE', 'REVENUE_PAGINATION_INCOMPLETE', 'CONFLICTING_REVENUE_PERIOD'];
+      const known = ['REVENUE_SOURCE_UNAVAILABLE', 'REVENUE_PLATFORM_REJECTED', 'REVENUE_NETWORK_ERROR', 'REVENUE_RESPONSE_TOO_LARGE', 'REVENUE_REQUEST_TIMEOUT', 'REVENUE_HTTP_ERROR', 'REVENUE_MONTH_UNAVAILABLE', 'REVENUE_MONTH_MISMATCH', 'REVENUE_DATE_UNAVAILABLE', 'REVENUE_DATE_OUTSIDE_RANGE', 'REVENUE_PAGINATION_INCOMPLETE', 'REVENUE_SUBCENT_PRECISION', 'CONFLICTING_REVENUE_PERIOD'];
       issues.push({ code: known.includes(error.code) ? error.code : 'REVENUE_SCHEMA_CHANGED', source, month: selected });
     }
   }
@@ -66,7 +75,11 @@ async function collectKuaishouRevenue({ accountId, identityKind, ownUserId, requ
     else await read('kuaishou.incentive_settlement', selected, async () => {
       const seen = new Set(); let total = null, consumed = 0, amount = 0n;
       for (let page = 1; page <= 20; page++) {
-        const data = unwrapKuaishou(await request(kuaishouRequest('incentive', { ownUserId, month: selected, page })));
+        const body = await request(kuaishouRequest('incentive', { ownUserId, month: selected, page }));
+        // The personal account endpoint can return HTTP 200 with {}. This
+        // supplies no bill and proves neither zero income nor lost authorization.
+        if (body && typeof body === 'object' && !Array.isArray(body) && !Object.keys(body).length) throw fault('REVENUE_SOURCE_UNAVAILABLE');
+        const data = unwrapKuaishou(body);
         if (!Array.isArray(data.list) || data.list.length > 50 || !Number.isSafeInteger(data.totalCount) || data.totalCount < 0 || data.totalCount > 1000) throw fault('REVENUE_SCHEMA_CHANGED');
         if (total !== null && total !== data.totalCount) throw fault('REVENUE_PAGINATION_INCOMPLETE');
         total = data.totalCount;
@@ -105,8 +118,9 @@ async function collectKuaishouRevenue({ accountId, identityKind, ownUserId, requ
         const date = dateValue(item.dateTime);
         if (date < start || date > end) throw fault('REVENUE_DATE_OUTSIDE_RANGE');
         if (item.receiveAmount === null || item.receiveAmount === undefined) continue;
+        const amountYuan = analysisYuan(item.receiveAmount);
         const row = record({ scope: 'kuaishou.live_trend', categoryId: 'live_gifts', categoryName: '直播送礼收入（平台分析口径）',
-          period: 'day', start: date, end: date, amountMinor: yuanToMinor(decimal(item.receiveAmount)), complete: true,
+          period: 'day', start: date, end: date, amountMinor: roundedYuanToMinor(amountYuan), amountYuan, complete: true,
           provisional: true, source: 'creator_center' }, fetchedAt);
         if (rows.has(date) && JSON.stringify(rows.get(date)) !== JSON.stringify(row)) throw fault('CONFLICTING_REVENUE_PERIOD');
         rows.set(date, row);

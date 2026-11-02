@@ -10,6 +10,36 @@ const collect = (platform, mutate = x => x, extra = {}) => collectCreatorRevenue
   request: async d => mutate(syntheticExtraRevenueResponse(platform, d), d), readWallet: async () => syntheticWalletResponse(), ...extra });
 const walletOptions = { fetchedAt: base.fetchedAt, requestedMonths: ['2026-09'] };
 
+test('Channels catalog balance and lifetime income survive save/restore without creating monthly income', async () => {
+  const snapshot = await collect('wechat_channels', (body, descriptor) => {
+    if (descriptor.source.endsWith('.catalog')) body.data.incomeDetails = [{ incomeType: 6, incomeTitle: '创作分成计划', permission: true,
+      wordingInfos: [{ wording: '累计收入', number: '8412' }, { wording: '可提现收入', number: '375' }] }];
+    if (descriptor.source.endsWith('.handoff')) body.data = { cocertInfo: { auditStatus: 0, incomeItems: [] }, studioInfos: [] };
+    return body;
+  });
+  assert(snapshot.issues.some(item => item.code === 'REVENUE_SETTLEMENT_ENTRY_UNAVAILABLE'));
+  assert.deepEqual(snapshot.metrics.map(m => [m.metric, m.period, m.amountMinor]), [['income', 'lifetime', '8412'], ['balance', 'current', '375']]);
+  assert.deepEqual(snapshot.records, []);
+  const owner = { platform: 'wechat_channels', accountId: base.accountId };
+  const ledger = createRevenueLedger(owner);
+  ledger.ingest(snapshot);
+  const restored = createRevenueLedger({ ...owner, state: ledger.export() });
+  assert.deepEqual(restored.metrics(), snapshot.metrics);
+  assert.equal(restored.months({ scope: 'wechat_channels.catalog', fromMonth: '2026-09', toMonth: '2026-09' })[0].coverage, 'missing');
+});
+
+test('Kuaishou retains exact fractions of a cent before aggregating a month', async () => {
+  const observed = await collect('kuaishou', (body, descriptor) => {
+    if (descriptor.source.endsWith('.live')) for (const row of body.data.trending) row.receiveAmount = '1.001';
+    return body;
+  });
+  const ledger = createRevenueLedger({ ...base, platform: 'kuaishou' });
+  ledger.ingest(observed);
+  const total = ledger.months({ scope: 'kuaishou.live_trend', categoryId: 'live_gifts' })[0];
+  assert.equal(total.amountMinor, '3003');
+  assert.equal(total.amountYuan, '30.03');
+});
+
 test('Kuaishou incentive settlement and live analysis stay separate with exact yuan conversion', async () => {
   const snapshot = await collect('kuaishou');
   assert.equal(snapshot.records.length, 31);
@@ -77,7 +107,7 @@ test('Kuaishou out-of-range dates, conflicting duplicate days and malformed mone
   for (const change of [
     rows => { rows[0].dateTime = '2026-08-31'; },
     rows => rows.push({ ...rows[0], receiveAmount: '9' }),
-    rows => { rows[2].receiveAmount = '1.001'; }
+    rows => { rows[2].receiveAmount = '1.0000001'; }
   ]) {
     const result = await collect('kuaishou', (body, d) => { if (d.source.endsWith('.live')) change(body.data.trending); return body; });
     assert.ok(!result.records.some(r => r.period === 'day'));

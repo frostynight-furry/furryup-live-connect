@@ -2,11 +2,11 @@
 
 New [four-platform synchronization](REVENUE_SYNC.en.md) and an [Android Douyin connector](ANDROID_REVENUE.en.md). The experimental [wallet source](DOUYIN_WALLET.en.md) supports posting-month pagination, explicit video/live labels, reconciliation and saved history. Authenticated web reuse and native Android identity remain unverified on real accounts. Android also requires an App-debuggable WebView; working phone authentication is not claimed.
 
-[中文](CREATOR_REVENUE.md) · [Follower sessions](CREATOR_FOLLOWERS.en.md)
+A verified Douyin creator web session received 20003 (not logged in) from the wallet origin used by the official app. The experimental web route can return 10011 for missing app context. Creator income and anchor analytics sync independently. The Android wallet reader still needs real-device bill verification.
 
-The independent `revenue/` module reuses an Electron host's authenticated creator session, reads reported income, stores acquired periods, builds monthly reports and imports normalized historical CSV summaries. It supports `bilibili/douyin/kuaishou/wechat_channels` with the source limits below. Channels video incentive currently requires reconciled statement import; not all income is automatically accessible.
+The `revenue/` module reuses authenticated creator sessions to read platform income, retain observed periods and import normalized statements. See the [scheduler](REVENUE_SYNC.en.md) for pagination and recovery.
 
-These independently authored adapters call the current creator website's read endpoints, not guaranteed public developer APIs. **Validation uses synthetic responses and real Electron execution, not a real revenue account.** `adapterValidation: 'synthetic_only'` describes the implementation's acceptance evidence; it does not label the data obtained from a signed-in account as synthetic. Compare dates and amounts against the account's actual pages before product deployment.
+Adapters use fields exposed by official creator pages. The Channels catalog and its cent unit were checked in an authorized host. `adapterValidation: 'catalog_live_verified'` describes that specific source. Standalone automated checks use synthetic inputs. Settlement statements and phone wallet access have separate verification requirements.
 
 ## Supported scope
 
@@ -17,18 +17,18 @@ These independently authored adapters call the current creator website's read en
 | Bilibili trend | Returned recent 30-day observations | The page excludes shop, contract and course income; separate scope from the monthly report |
 | Douyin revenue center | Aggregate/category recent summaries, category lifetime where shown, recent 30-day details | Selecting lifetime does not expose lifetime daily history; hidden lifetime totals for aggregate/Xingtu are not manufactured |
 | Douyin anchor dashboard | Today, rolling 7/30-day summaries and dated recent 30-day trend points at anchor/dashboard/home | Select anchor_dashboard separately; preserve metadata units, without converting Yinlang to CNY or claiming net wallet settlement income |
-| Douyin mobile wallet (experimental) | Monthly pagination/reconciliation, explicit video/live labels, saved history, sync and Android native bridge code | Select wallet; web reuse and native identity/bills require real acceptance, and the App must allow WebView debugging; combined labels stay unsplit and posting dates differ from earning dates |
+| Douyin wallet (experimental) | Parse postings by month and explicit category | The official app uses an independent wallet login context. The native Android reader still needs device verification |
 | Kuaishou video incentive | Personal member settlement bills for the creator incentive cooperation plan, with pagination and owner/month verification | One plan, not every advertising/task/Kuaijiedan program; selector starts at 2019-08, subject to permissions/migration |
 | Kuaishou live | Daily gift-income analytics over custom date ranges, aggregated by natural month | Selector starts at 2019-04, ends yesterday, maximum 31 days per range; not after-tax net settlement, missing days are not zero |
 | Channels live settlement | Native own-account handoff to the official wallet, reading visible monthly bills and business types | Requires a usable primary settlement subject, verification and bill access; additional studio subjects are not selected; complete history is not guaranteed |
-| Channels video incentive | Desktop eligibility discovery and monthly/persistent normalized statement import | The verified desktop endpoint supplies mobile instructions/cards, not amounts; automatic acquisition reports REVENUE_VIDEO_INCENTIVE_MOBILE_REQUIRED |
+| Channels account overview | Synchronize available lifetime totals and current balances by category | Mobile verification is required for daily/monthly video incentive details. Account metrics are excluded from monthly totals |
 | Earlier history | Retain future synchronized observations or import normalized statements | Login alone cannot recover history the platform does not expose; unavailable months stay missing |
 
 Douyin categories are discovered dynamically. For parents with subcategories, only leaves are collected, preventing parent/child double-counting. The paid-video page has a different implementation and yields `REVENUE_CATEGORY_ENDPOINT_UNSUPPORTED`. Collection is bounded to 24 leaves by default; overflow reports `REVENUE_CATEGORY_LIMIT`. Label-based display classification is not evidence of settlement.
 
 The default `creator_center` source reports `REVENUE_ANCHOR_NOT_REQUESTED` to identify the separate dashboard source. The adapter reads `earnScore` from the [official anchor data page](https://anchor.douyin.com/anchor/dashboard/home). Do not add it to creator-center totals or label it complete net live settlement income.
 
-Every amount remains `provisional: true`, reflecting reported platform income rather than guaranteed after-tax payouts. Never add an aggregate to its breakdown or combine distinct scopes.
+Reported estimates carry the `provisional` flag. Catalog metrics store displayed balances or lifetime totals. Compare observations with the same source, period and unit.
 
 ## Kuaishou and Channels integration
 
@@ -45,7 +45,7 @@ Channels uses only the primary subject returned by `getRelatedMainPart`. Its sho
 
 Known monthly wallet businesses are live gifts, paid teams, paid live, Channels membership, paid courses and paid drama. The last three are not video incentives. `totalIncome` uses ten-thousandths of a yuan and is accepted only when exactly convertible to cents; otherwise `REVENUE_SUBCENT_PRECISION` prevents rounding. Unsettled balance `unaccountedIncome`, withdrawals and eligibility cards never produce revenue records. Complete coverage of a closed month is not proof of payment or after-tax income; the current month remains partial. Unknown categories, duplicate bills or schema changes reject the monthly batch atomically.
 
-For Channels video incentives, reconcile monthly figures from the owner's mobile view or official statement, then import canonical CSV under `statement.video / video_incentive`. Its months stay separate from live settlement and remain available when automatic collection is unavailable. Hosts can use the [shared scheduler](REVENUE_SYNC.en.md) to refresh sources and persist history while their process runs; it installs no operating-system scheduled tasks.
+The official Channels catalog returns account-level lifetime income and withdrawable balances in CNY cents. The ledger stores these under `wechat_channels.catalog` as `income/lifetime` and `balance/current`. Daily and monthly video incentive details require mobile verification. Live monthly bills also require an initialized settlement subject. Unavailable months remain missing. Reconciled monthly imports use `statement.video / video_incentive`.
 
 ## Run
 

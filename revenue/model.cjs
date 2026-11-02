@@ -13,6 +13,18 @@ function yuanToMinor(value) {
   const negative = value.startsWith('-'), [whole, fraction = ''] = value.replace(/^-/, '').split('.');
   return minor(String((BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'))) * (negative ? -1n : 1n)));
 }
+function minorToYuan(value) {
+  const n = BigInt(minor(value)), s = (n < 0n ? -n : n).toString().padStart(3, '0');
+  return (n < 0n ? '-' : '') + s.slice(0, -2) + '.' + s.slice(-2);
+}
+// Some official analysis APIs report fractional cents. Preserve their exact
+// decimal separately; round only the compatible cent projection, after summing.
+function roundedYuanToMinor(value) {
+  const text = decimal(value), negative = text.startsWith('-');
+  const [integer, fraction = ''] = text.replace(/^-/, '').split('.');
+  const micro = BigInt(integer) * 1000000n + BigInt(fraction.padEnd(6, '0'));
+  return minor(String(((micro + 5000n) / 10000n) * (negative ? -1n : 1n)));
+}
 function day(value) {
   if (typeof value !== 'string' || !/^20\d{2}-\d{2}-\d{2}$/.test(value)) throw fault('INVALID_REVENUE_DATE');
   const time = Date.parse(value + 'T00:00:00Z');
@@ -68,16 +80,29 @@ function record(row, fetchedAt) {
   if (row.currency !== undefined && row.currency !== 'CNY') throw fault('INVALID_REVENUE_CURRENCY');
   const start = day(row.start), end = day(row.end);
   if ((row.period === 'day' && start !== end) || (row.period === 'month' && (start.slice(8) !== '01' || end !== monthEnd(start.slice(0, 7))))) throw fault('INVALID_REVENUE_RECORD');
+  const exact = row.amountYuan === undefined ? undefined : decimal(row.amountYuan);
+  if (exact !== undefined && roundedYuanToMinor(exact) !== minor(row.amountMinor)) throw fault('INVALID_REVENUE_AMOUNT');
+  let historyReview;
+  if (row.historyReview !== undefined) {
+    if (row.scope !== 'kuaishou.live_trend' || row.source !== 'creator_center' || row.period !== 'day' || row.complete !== false ||
+      !row.historyReview || row.historyReview.reportedAmountMinor !== '0' || Number(exact ?? minorToYuan(row.amountMinor)) <= 0) throw fault('INVALID_REVENUE_RECORD');
+    historyReview = { checkedAt: timestamp(row.historyReview.checkedAt), reportedAmountMinor: '0' };
+  }
   return { scope: token(row.scope), categoryId: token(row.categoryId), categoryName: label(row.categoryName),
     period: row.period, start, end, amountMinor: minor(row.amountMinor), currency: 'CNY', complete: row.complete,
+    ...(exact !== undefined ? { amountYuan: exact } : {}),
+    ...(historyReview ? { historyReview } : {}),
     provisional: row.provisional !== false, source: row.source, fetchedAt: timestamp(row.fetchedAt || fetchedAt) };
 }
 const recordKey = row => JSON.stringify([row.scope, row.categoryId, row.period, row.start]);
 function metric(row, fetchedAt) {
-  if (!row || row.metric !== 'income' || !['today', 'previous_day', 'rolling_7_days', 'rolling_30_days', 'rolling_year', 'lifetime'].includes(row.period)) throw fault('INVALID_REVENUE_METRIC');
+  const balance = row?.scope === 'wechat_channels.catalog' && row.metric === 'balance' && row.period === 'current';
+  if (!row || !balance && (row.metric !== 'income' || !['today', 'previous_day', 'rolling_7_days', 'rolling_30_days', 'rolling_year', 'lifetime'].includes(row.period))) throw fault('INVALID_REVENUE_METRIC');
+  if (balance && (row.start !== undefined || row.end !== undefined || BigInt(minor(row.amountMinor)) < 0n)) throw fault('INVALID_REVENUE_METRIC');
   if (row.currency !== undefined && row.currency !== 'CNY') throw fault('INVALID_REVENUE_CURRENCY');
   if ((row.start === undefined) !== (row.end === undefined) || (row.start !== undefined && day(row.start) > day(row.end))) throw fault('INVALID_REVENUE_DATE');
-  return { scope: token(row.scope), categoryId: token(row.categoryId), metric: 'income', period: row.period,
+  return { scope: token(row.scope), categoryId: token(row.categoryId), metric: balance ? 'balance' : 'income', period: row.period,
+    ...(row.categoryName ? { categoryName: label(row.categoryName) } : {}),
     amountMinor: minor(row.amountMinor), currency: 'CNY', provisional: row.provisional !== false,
     ...(row.asOf ? { asOf: day(row.asOf) } : {}),
     ...(row.start !== undefined ? { start: day(row.start), end: day(row.end) } : {}),
@@ -114,5 +139,5 @@ function nativeMetric(row, fetchedAt) {
 }
 const nativeRecordKey = row => JSON.stringify([recordKey(row), row.unit]);
 const nativeMetricKey = row => JSON.stringify([metricKey(row), row.unit]);
-module.exports = { REVENUE_PLATFORMS, fault, minor, yuanToMinor, day, month, chinaDay, shiftMonth, monthEnd, monthRange, token, label, timestamp, binding, record, recordKey, metric, metricKey,
+module.exports = { REVENUE_PLATFORMS, fault, minor, yuanToMinor, minorToYuan, roundedYuanToMinor, day, month, chinaDay, shiftMonth, monthEnd, monthRange, token, label, timestamp, binding, record, recordKey, metric, metricKey,
   decimal, sumDecimal, nativeUnit, nativeRecord, nativeMetric, nativeRecordKey, nativeMetricKey };

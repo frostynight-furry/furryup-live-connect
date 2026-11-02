@@ -13,7 +13,7 @@ function syntheticRevenueResponse(platform, descriptor) {
     if (path.endsWith('/index/income')) return { code: 0, data: { date: { datex: seconds }, summary: { state: 99, daily_amt: 0, thirty_days_amt: 2100, annual_amt: 10000 }, detail: [{ enum: 1, state: 99, daily_amt: 0, thirty_days_amt: 1000, annual_amt: 5000 }] } };
     if (path.endsWith('/trend')) return { code: 0, data: { data: [{ date: seconds, amt: 0 }, { date: seconds + 86400, amt: 2100 }] } };
     if (path.endsWith('/judge')) return { code: 0, data: { is_normal_show: true,
-      income_market: { current_month: url.searchParams.get('current_month'), current_month_income: 2100 },
+      income_market: { current_month: url.searchParams.get('current_month') || '202609', current_month_income: 2100 },
       income_structure: { current_month_detail: [{ enum: 1, amt: 1000, state: 99 }, { enum: 6, amt: 1100, state: 99 }] } } };
   } else if (platform === 'douyin') {
     if (path.endsWith('/auth/')) return { status_code: 0, optional_category_list: [

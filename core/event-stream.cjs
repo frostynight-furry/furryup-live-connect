@@ -247,8 +247,9 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
     event_id: `${preview ? 'preview' : 'live'}:${platform}:${encodeURIComponent(roomId)}:${encodeURIComponent(sourceId)}`,
     source_msg_id: sourceMessageId,
     platform, room_id: roomId, event_type: raw.event_type,
-    source: preview ? 'simulation' : isStats && platform === 'bilibili' && raw.stats_source === 'bilibili-online-rank-api'
-      ? 'bilibili-online-rank-api' : platform === 'wechat' ? 'wechat-backstage' : 'ordinaryroad', preview,
+    source: preview ? 'simulation' : isStats && platform === 'bilibili' &&
+      ['bilibili-online-rank-api', 'bilibili-online-snapshot-api'].includes(raw.stats_source)
+      ? raw.stats_source : platform === 'wechat' ? 'wechat-backstage' : 'ordinaryroad', preview,
     user_id: viewerId(raw.user_id), user_name: clean(raw.user_name || '一位朋友', 64),
     ...(raw.user_identity_hidden === true ? { user_identity_hidden: true } : {}),
     ...avatarInfo(raw.avatar_url, platform),

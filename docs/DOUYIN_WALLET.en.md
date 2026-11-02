@@ -2,7 +2,7 @@
 
 [中文](DOUYIN_WALLET.md) · [Four-platform revenue](CREATOR_REVENUE.en.md)
 
-This source implements monthly pagination, explicit video/live posting categories, reconciled statements and saved history. New additions are an [Android native bridge reader](ANDROID_REVENUE.en.md) and [shared four-platform scheduler](REVENUE_SYNC.en.md). **Real-account acceptance, authenticated web reuse and native Android identity remain unverified.** `source:'wallet'` is experimental; working phone authentication is not claimed, and iPhone support is not implemented.
+A verified Douyin creator web session received 20003 (not logged in) from the wallet origin used by the official app. The experimental web route can return 10011 for missing app context. Creator income and anchor analytics sync independently. The Android wallet reader still needs real-device bill verification. [Android integration](ANDROID_REVENUE.en.md)
 
 ## Verified contract and authentication boundary
 

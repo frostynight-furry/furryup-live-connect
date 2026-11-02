@@ -40,7 +40,10 @@ test('Bilibili month fallback, unavailable reports and updating parts are not co
     [data => { data.income_market.current_month = '202608'; }, 'REVENUE_MONTH_MISMATCH'],
     [data => { data.is_normal_show = false; }, 'REVENUE_MONTH_UNAVAILABLE']
   ]) {
-    const result = await collect('bilibili', (body, d) => { if (d.source.endsWith('.monthly')) change(body.data); return body; });
+    const result = await collect('bilibili', (body, d) => {
+      if (d.source.endsWith('.monthly') && new URL(d.url).searchParams.has('current_month')) change(body.data);
+      return body;
+    });
     assert.ok(result.issues.some(i => i.code === expected)); assert.ok(!result.records.some(r => r.period === 'month'));
   }
   const result = await collect('bilibili', (body, d) => { if (d.source.endsWith('.monthly')) body.data.income_structure.current_month_detail[1].state = 0; return body; });

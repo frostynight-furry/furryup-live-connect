@@ -72,3 +72,11 @@ npm run test:creator:electron
 沿用 2026-10-26 核验的开源调研：千帆云递 [social-auto-upload-web-ui](https://github.com/DevilJie/social-auto-upload-web-ui/tree/fbf79a49b639a1b762e4d5c4ec48c87094e860cd) 有五平台 `sync_profile`，适合参考后台指标位置；根 MIT 与 README 使用范围文案不一致，因此未复制其 Python 实现或引入发布器／隐身浏览器。F2（Apache-2.0）可作抖音资料参考，但不为单个统计引入下载器和签名维护；MediaCrawler 的非商业限制不适合作为产品复制依赖；已归档的 bilibili-api 不作新依赖。本适配复用现有 Electron 会话与 LiveConnect 的视频号 UA 兼容方式。
 
 视频号 `auth_data` 字段另参考 wordweb/Get-Tencent-Video-Live-Barrage-Gifts 的字段描述；没有复制或执行其代码。快手与视频号实际本人响应的字段在宿主实测时核对。参考项目、官方网页代码、平台图片及真实账号材料均未分发，见 [第三方说明](../THIRD_PARTY_NOTICES.md)。
+
+## 复用扫码后的直播授权
+
+在 Electron 主进程中，`connectIdentity({ owner, platform })` 完成官方登录并返回 `accountId` 和 `identityKind`。之后可用 `identify({ owner, platform, expectedIdentity, identityKind })` 静默复核同一身份，两者都能在粉丝数尚未返回时使用。
+
+B站、抖音、快手从 `session.fromPartition(partitionFor(owner, platform, prefix))` 调用 `cookies.get({ url })`，`url` 固定为该平台的官方直播 HTTPS 域。把当前有效的 Cookie 交给 `createJavaCollector({ room, cookie, ... })`，凭据经标准输入进入采集进程。连接前核对当前宿主账号，账号切换或撤销时停止旧任务。
+
+视频号的 `WechatCollector` 支持 `sharedSession()`，由宿主返回 `{ session, assertAuthorized, assertIdentity }`。宿主负责分区权限与撤销。校验函数同步抛错即可终止失效授权或不匹配的 finder。断开采集后，宿主仍可用原会话读取粉丝与收益。

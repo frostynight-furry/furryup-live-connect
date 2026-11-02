@@ -74,6 +74,7 @@
       "enum": [
         "simulation",
         "bilibili-online-rank-api",
+        "bilibili-online-snapshot-api",
         "wechat-backstage",
         "ordinaryroad"
       ]

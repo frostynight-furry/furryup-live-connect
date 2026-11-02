@@ -27,7 +27,9 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
     const account = getAccount(); if (!account || account.accountId !== owner || account.kind === 'signed-out') throw fault('ACCOUNT_CHANGED');
   }
   function lower(source) {
-    let first = platform === 'kuaishou' ? '2019-04' : source.source === 'wallet' ? source.earliestAvailableMonth : null;
+    // Default backfill covers a useful year, not every month since the platform
+    // launched. Explicit older ranges and already-saved history remain available.
+    let first = platform === 'kuaishou' ? fromMonth || shiftMonth(current(), -11) : source.source === 'wallet' ? source.earliestAvailableMonth : null;
     if (fromMonth && (!first || fromMonth > first)) first = fromMonth;
     return first;
   }
@@ -59,7 +61,9 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
     const all = history(source).reverse(), missing = all.filter(m => !checked.has(m));
     const stale = all.filter(m => checked.has(m) && Date.parse(checked.get(m).checkedAt) <= now() - historyRefreshMs);
     const candidates = source.source === 'wallet' && !source.earliestAvailableMonth ? [current()] :
-      [...(source.status === 'error' && source.retryMonth ? [source.retryMonth] : []), ...recent, ...missing, ...stale];
+      // Fresh earnings take priority over an old failed backfill month. A
+      // permanently unavailable historical response must not starve this month.
+      [...recent, ...(source.status === 'error' && source.retryMonth ? [source.retryMonth] : []), ...missing, ...stale];
     return [...new Set(candidates)].slice(0, batchMonths).map(m => ({ fromMonth: m, toMonth: m }));
   }
   async function save(next, version) {
@@ -95,12 +99,16 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
             if (snapshot.source !== name || Date.parse(timestamp(snapshot.fetchedAt)) > now() || !Array.isArray(snapshot.records) || !Array.isArray(snapshot.issues)) throw fault('REVENUE_SCHEMA_CHANGED');
             if (name !== 'anchor_dashboard' && JSON.stringify(snapshot.requestedMonths) !== JSON.stringify(monthRange(job.fromMonth, job.toMonth))) throw fault('REVENUE_MONTH_MISMATCH');
             const issues = cleanIssues(snapshot.issues), block = issues.find(i => needsLogin.has(i.code));
+            const unavailableSource = issues.some(i => ['REVENUE_WALLET_WEB_UNAVAILABLE', 'REVENUE_WALLET_REQUEST_CONTEXT_REQUIRED'].includes(i.code));
             const problem = issues.find(i => !informative.has(i.code) && !unavailable.has(i.code) && !needsLogin.has(i.code));
             const rows = [...snapshot.records, ...(snapshot.nativeRecords || [])];
             if (perMonth(source) && rows.some(row => row.start?.slice(0, 7) !== job.fromMonth)) throw fault('REVENUE_MONTH_MISMATCH');
             const hasData = rows.length + (snapshot.metrics?.length || 0) + (snapshot.nativeMetrics?.length || 0) > 0;
             const ledger = createRevenueLedger({ platform, accountId, state: state.ledger }); ledger.ingest(snapshot);
-            let next = { ...source, lastAttemptAt: attemptAt, lastCheckedAt: snapshot.fetchedAt, issues,
+            // A backfill checks several months. Keep the reason for every other
+            // month; only replace observations belonging to this request.
+            const retainedIssues = source.issues.filter(i => i.month && !snapshot.requestedMonths.includes(i.month));
+            let next = { ...source, lastAttemptAt: attemptAt, lastCheckedAt: snapshot.fetchedAt, issues: [...retainedIssues, ...issues].slice(-500),
               ...(hasData ? { lastSuccessAt: snapshot.fetchedAt } : {}), failures: problem ? Math.min(source.failures + 1, 1000) : 0,
               status: block && !hasData ? 'needs_login' : problem ? 'error' : hasData ? issues.length ? 'partial' : 'synced' : 'unavailable' };
             delete next.lastErrorCode;
@@ -110,11 +118,11 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
             if (name === 'wallet') {
               if (snapshot.earliestAvailableMonth) next.earliestAvailableMonth = month(snapshot.earliestAvailableMonth);
               const check = snapshot.checkedMonths?.find(r => r.month === job.fromMonth);
-              if (!problem && !block && (!check || !['stored', 'no_data'].includes(check.status))) throw fault('REVENUE_SCHEMA_CHANGED');
+              if (!problem && !block && !unavailableSource && (!check || !['stored', 'no_data'].includes(check.status))) throw fault('REVENUE_SCHEMA_CHANGED');
               if (check && (snapshot.checkedMonths.length !== 1 || (check.status === 'stored' ? snapshot.statements?.length !== 1 || snapshot.statements[0].month !== job.fromMonth : snapshot.statements?.length || snapshot.records.length))) throw fault('REVENUE_SCHEMA_CHANGED');
               if (check?.status === 'no_data' && source.months.some(r => r.month === job.fromMonth && r.outcome !== 'no_data')) throw fault('REVENUE_WALLET_SNAPSHOT_CHANGED');
             }
-            if (perMonth(source) && !problem && !block) {
+            if (perMonth(source) && !problem && !block && !unavailableSource) {
               const outcome = !rows.length ? 'no_data' : rows.every(r => r.complete) && !issues.some(i => unavailable.has(i.code)) ? 'observed' : 'partial';
               next.months = [...source.months.filter(r => r.month !== job.fromMonth), { month: job.fromMonth, checkedAt: snapshot.fetchedAt, outcome }];
             }
@@ -122,7 +130,7 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
             else next.nextCheckAt = new Date(now() + (problem ? Math.min(intervalMs, backfillIntervalMs * 2 ** Math.min(next.failures - 1, 10)) : intervalMs)).toISOString();
             // Continue this bounded batch without letting its persisted next-due time block subsequent months.
             await updateSource(next, ledger.export(), version); source = { ...next, nextCheckAt: undefined };
-            if (block || problem) break;
+            if (block || problem || unavailableSource) break;
           } catch (error) {
             guard(version); const code = safeCode(error);
             if (['ACCOUNT_CHANGED', 'PLATFORM_ACCOUNT_CHANGED', 'REVENUE_ACCOUNT_MISMATCH', 'REVENUE_STORAGE_ERROR', 'REVENUE_STORAGE_LIMIT'].includes(code)) throw fault(code);
@@ -138,7 +146,7 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
         if (!attempts && stored.status !== 'needs_login' && (!stored.nextCheckAt || stored.nextCheckAt <= iso())) {
           await updateSource({ ...stored, nextCheckAt: new Date(now() + intervalMs).toISOString() }, state.ledger, version);
         }
-        if (stored.status !== 'needs_login' && stored.status !== 'error' && pendingMonths(stored)) {
+        if (attempts && stored.status !== 'needs_login' && stored.status !== 'error' && pendingMonths(stored)) {
           await updateSource({ ...stored, nextCheckAt: new Date(now() + backfillIntervalMs).toISOString() }, state.ledger, version);
         }
       }
@@ -167,7 +175,7 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
     }).finally(() => { pending = undefined; schedule(version); }); return pending;
   }
   const stop = () => { enabled = false; generation++; if (timer !== undefined) timers.clearTimeout(timer); timer = undefined; emit({ state: 'stopped', nextRunAt: null }); };
-  return { start() { if (disposed) return Promise.reject(fault('REVENUE_SYNC_STOPPED')); enabled = true; return launch(true); },
+  return { start(options) { if (disposed) return Promise.reject(fault('REVENUE_SYNC_STOPPED')); enabled = true; return launch(options?.force === true, options?.sources); },
     syncNow: options => launch(true, options?.sources), stop, dispose() { stop(); disposed = true; },
     status: () => structuredClone(info), export: () => state ? structuredClone(state.ledger) : createRevenueLedger({ platform, accountId, state: seed }).export() };
 }

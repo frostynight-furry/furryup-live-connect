@@ -74,9 +74,9 @@ Windows 使用带盘符的绝对路径，含空格时为整个 `--adb=...` 或 `
 
 ## 视频号视频激励的剩余缺口
 
-电脑端[官方收入卡片](https://res.wx.qq.com/t/wx_fed/finder/helper/content/finder-helper-content/res/static/js/async/880.4945ce38.js)给出手机微信入口 `https://channels.weixin.qq.com/assistant-support/pages/creator-home/income`，附带本人账号标识；它不是已核实的金额 API。未认证访问该网页返回页面校验失败。[腾讯广告官方说明](https://training.tencentads.com/uploads/202406/lUKWuerT_DtCfUk.pdf)展示手机创作者中心内的广告收入／创作分成操作，但未提供可复用的账单接口契约。
+视频号的官方收益概览提供账户累计收入和可提现余额。`wechat_channels.catalog` 使用人民币分，`income/lifetime` 与 `balance/current` 单独保存。逐日和逐月创作分成需要手机侧验证。直播月账单还需要可用的结算主体，缺少账单的月份保留为空。
 
-目前没有添加猜测的金额端点、微信私有数据库读取或会员收入替代实现。四平台公共同步和历史保存已实现；视频号视频激励自动读取仍缺实机中的入口、身份和按月响应字段。需本人手机实际打开对应页面后确认这些事实，再补适配器和独立合成用例。已实现的视频号直播结算不受此缺口影响，详见[收益来源表](CREATOR_REVENUE.md)。
+安卓连接器针对抖音官方钱包。视频号的概览、月账单和规范化补录由独立读取器处理。[收益来源](CREATOR_REVENUE.md)
 
 ## 手机连接后的验收项
 

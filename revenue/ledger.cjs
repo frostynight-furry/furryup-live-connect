@@ -1,7 +1,7 @@
 // Copyright (c) 2026 FrostyNight. See LICENSE.
 'use strict';
 const { fault, binding, record, recordKey, metric, metricKey, monthRange, monthEnd, token, timestamp, minor, yuanToMinor, month, day,
-  nativeUnit, nativeRecord, nativeMetric, nativeRecordKey, nativeMetricKey, sumDecimal } = require('./model.cjs');
+  nativeUnit, nativeRecord, nativeMetric, nativeRecordKey, nativeMetricKey, sumDecimal, minorToYuan, roundedYuanToMinor } = require('./model.cjs');
 const { WALLET_SCOPE, INCOME_SCOPE, walletStatement, walletRecords } = require('./wallet-statement.cjs');
 const walletScope = row => [WALLET_SCOPE, INCOME_SCOPE].includes(row.scope);
 
@@ -10,6 +10,15 @@ function mergeRows(current, incoming, keyFor) {
   for (const row of incoming) {
     const key = keyFor(row), old = next.get(key);
     if (seen.has(key)) throw fault('DUPLICATE_REVENUE_PERIOD'); seen.add(key);
+    // Some platform analytics replace expired historical days with zero. Keep
+    // the earlier positive observation, visibly unverified, rather than erase
+    // it or treat the two conflicting observations as a confirmed correction.
+    if (old?.historyReview && row.fetchedAt < old.historyReview.checkedAt) continue;
+    if (old && row.fetchedAt > old.fetchedAt && row.scope === 'kuaishou.live_trend' && row.source === 'creator_center' &&
+      old.source === 'creator_center' && row.period === 'day' && row.start.slice(0, 7) < row.fetchedAt.slice(0, 7) &&
+      Number(old.amountYuan ?? minorToYuan(old.amountMinor)) > 0 && Number(row.amountYuan ?? minorToYuan(row.amountMinor)) === 0) {
+      next.set(key, { ...old, complete: false, historyReview: { checkedAt: row.fetchedAt, reportedAmountMinor: '0' } }); continue;
+    }
     if (!old || row.fetchedAt > old.fetchedAt) next.set(key, row);
     else if (row.fetchedAt === old.fetchedAt && JSON.stringify(row) !== JSON.stringify(old)) throw fault('CONFLICTING_REVENUE_PERIOD');
   }
@@ -27,7 +36,8 @@ function summarizeMonths(selected, { fromMonth, toMonth }, describe) {
     const expectedDays = Number(monthEnd(value).slice(8));
     const coveredDays = monthly ? (monthly.complete ? expectedDays : null) : used.filter(row => row.complete).length;
     const complete = monthly ? monthly.complete : coveredDays === expectedDays;
-    return { month: value, ...describe(used, complete), coverage: complete ? 'complete' : used.length ? 'partial' : 'missing',
+    const historyReviewDays = used.filter(row => row.historyReview).map(row => row.start);
+    return { month: value, ...describe(used, complete), ...(historyReviewDays.length ? { historyReviewDays } : {}), coverage: complete ? 'complete' : used.length ? 'partial' : 'missing',
       coveredDays, expectedDays, provisional: used.length ? used.some(row => row.provisional) : null,
       fetchedAt: used.length ? used.map(row => row.fetchedAt).sort().at(-1) : null };
   });
@@ -110,8 +120,10 @@ function createRevenueLedger({ platform, accountId, state } = {}) {
       token(scope); token(categoryId);
       const selected = [...records.values()].filter(row => row.scope === scope && row.categoryId === categoryId);
       return summarizeMonths(selected, { fromMonth, toMonth }, (used, complete) => {
-        const observed = used.length ? minor(String(used.reduce((sum, row) => sum + BigInt(row.amountMinor), 0n))) : null;
-        return { scope, categoryId, currency: 'CNY', amountMinor: complete ? observed : null, observedAmountMinor: observed };
+        const exact = used.some(row => row.amountYuan !== undefined) ? sumDecimal(used.map(row => row.amountYuan ?? minorToYuan(row.amountMinor))) : null;
+        const observed = exact !== null ? roundedYuanToMinor(exact) : used.length ? minor(String(used.reduce((sum, row) => sum + BigInt(row.amountMinor), 0n))) : null;
+        return { scope, categoryId, currency: 'CNY', amountMinor: complete ? observed : null, observedAmountMinor: observed,
+          ...(exact !== null ? { amountYuan: complete ? exact : null, observedAmountYuan: exact } : {}) };
       });
     }
   };

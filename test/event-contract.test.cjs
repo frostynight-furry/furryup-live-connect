@@ -14,6 +14,15 @@ test('schema enumerates exactly the public platforms and event types', () => {
   assert.deepEqual(schema.properties.event_type.enum, [...EVENT_TYPES]);
 });
 
+test('verified HTTP audience source conforms and cannot relabel gifts or other platforms', () => {
+  for (const watching_count of [0, 4]) {
+    const event = normalizeEvent(raw('room_stats', { watching_count, stats_source: 'bilibili-online-snapshot-api' }), 'bilibili', 'synthetic-room');
+    expectValid(event); assert.equal(event.source, 'bilibili-online-snapshot-api'); assert.equal(event.watching_count, watching_count);
+  }
+  assert.equal(normalizeEvent(raw('gift', { gift_count: 1, stats_source: 'bilibili-online-snapshot-api' }), 'bilibili', 'synthetic-room').source, 'ordinaryroad');
+  assert.equal(normalizeEvent(raw('room_stats', { watching_count: 4, stats_source: 'bilibili-online-snapshot-api' }), 'douyin', 'synthetic-room').source, 'ordinaryroad');
+});
+
 test('all event variants conform; unknown values stay absent and snapshots are not increments', () => {
   for (const type of EVENT_TYPES) {
     const extras = {

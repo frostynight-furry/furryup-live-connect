@@ -36,6 +36,7 @@ import tech.ordinaryroad.live.chat.client.commons.base.constant.SocialActionEnum
 public final class Collector {
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final KuaishouAvatarCache KUAISHOU_AVATARS = new KuaishouAvatarCache();
+  private static final KuaishouGiftPrices KUAISHOU_GIFT_PRICES = new KuaishouGiftPrices(Collector::diagnostic);
   // Java 21 keeps stdout.encoding separate from file.encoding on Windows (often GBK).
   // The host reads UTF-8 JSON lines, so encode directly at the process pipe boundary.
   private static final PrintStream OUT = new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
@@ -47,7 +48,9 @@ public final class Collector {
     OUT.flush();
   }
   private static void status(String state) {
-    emit(JSON.createObjectNode().put("kind", "status").put("state", state));
+    var message = JSON.createObjectNode().put("kind", "status").put("state", state);
+    if ("bilibili".equals(platform) && "connected".equals(state)) message.put("transportHealth", true);
+    emit(message);
   }
   private static void diagnostic(String metric) {
     emit(JSON.createObjectNode().put("kind", "diagnostic").put("metric", metric));
@@ -149,6 +152,8 @@ public final class Collector {
       if (wire.getGroupId() > 0) e.put("combo_id", Long.toString(wire.getGroupId()));
     } else if (msg instanceof KuaishouGiftMsg kuaishou && kuaishou.getMsg() != null) {
       optionalText(e, "combo_id", kuaishou.getMsg().getMergeKey());
+      Long price = KUAISHOU_GIFT_PRICES.price(gift.getGiftId());
+      if (price != null) e.put("gift_price_raw", price).put("gift_price_unit", "kuaibi");
     }
     // Protobuf default users have ID 0 even when no recipient was sent.
     boolean hasRecipient = !(msg instanceof DouyinGiftMsg douyin) || (douyin.getMsg() != null && douyin.getMsg().hasToUser());
@@ -302,6 +307,18 @@ public final class Collector {
           Object message = args[args.length - 1];
           boolean otherCommand = method.getName().equals("onOtherCmdMsg") || method.getName().equals("onUnknownCmd");
           String cmd = text(get(message, "getCmd")).split(":", 2)[0];
+          if ("bilibili".equals(platform) && BilibiliAudience.supports(cmd)) {
+            // SDK delivers onMsg plus a specialized callback. Decode exactly
+            // once from onMsg, including suffixed commands handled as unknown.
+            if (method.getName().equals("onMsg")) {
+              diagnostic("audienceFrames");
+              Object rawData = get(message, "getData");
+              ObjectNode audience = BilibiliAudience.decode(rawData instanceof JsonNode data ? data : null);
+              if (audience == null) diagnostic("audienceMissingCount");
+              else { diagnostic("audienceValidCount"); extraEvent(audience); }
+            }
+            return null;
+          }
           if (method.getName().equals("onMsg")) {
             ObjectNode viewers = ViewerSnapshots.decode(message);
             if (viewers != null) extraEvent(viewers);
@@ -370,7 +387,8 @@ public final class Collector {
     try {
       switch (platform) {
         case "bilibili" -> {
-          var client = new BilibiliAuthenticatedClient(BilibiliLiveChatClientConfig.builder().roomId(room).cookie(cookie).autoReconnect(false).build(), listener(IBilibiliMsgListener.class)) {
+          var client = new BilibiliAuthenticatedClient(BilibiliLiveChatClientConfig.builder().roomId(room).cookie(cookie).autoReconnect(false).build(), listener(IBilibiliMsgListener.class),
+              () -> emit(JSON.createObjectNode().put("kind", "transport"))) {
             @Override public BilibiliRoomInitResult initRoom() {
               BilibiliRoomInitResult result = super.initRoom();
               roomInfo(result, "");
@@ -413,13 +431,14 @@ public final class Collector {
                 throw new ConnectionFailure("NO_LIVE_SESSION");
               }
               roomInfo(result, text(get(result, "getRoomDescription")));
+              KUAISHOU_GIFT_PRICES.start(result.getLiveStreamId(), cookie, true);
               return result;
             }
           };
-          Runtime.getRuntime().addShutdownHook(new Thread(client::destroy));
+          Runtime.getRuntime().addShutdownHook(new Thread(() -> { KUAISHOU_GIFT_PRICES.close(); client.destroy(); }));
           client.addStatusChangeListener((evt, oldState, newState) -> status(newState.name().toLowerCase()));
           client.connect(null, Collector::failure);
-          while (input.readLine() != null) { } client.destroy();
+          while (input.readLine() != null) { } KUAISHOU_GIFT_PRICES.close(); client.destroy();
         }
         default -> status("invalid-platform");
       }

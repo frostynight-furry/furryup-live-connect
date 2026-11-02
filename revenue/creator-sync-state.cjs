@@ -2,7 +2,7 @@
 'use strict';
 const { createHash, randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises'), path = require('node:path');
-const { binding, fault, timestamp, month, chinaDay } = require('./model.cjs');
+const { binding, fault, timestamp, month, chinaDay, token } = require('./model.cjs');
 const { createRevenueLedger } = require('./ledger.cjs');
 const identityKinds = { bilibili: ['uid'], douyin: ['account-cookie-uid_tt', 'native_uid'],
   kuaishou: ['user_id', 'account-cookie-userId', 'account-cookie-kuaishou.userId'], wechat_channels: ['finder'] };
@@ -11,8 +11,8 @@ const informative = new Set(['REVENUE_HISTORY_RECENT_DAYS_ONLY', 'REVENUE_ANCHOR
   'REVENUE_LIVE_ANALYTICS_NOT_NET_SETTLEMENT', 'REVENUE_INCENTIVE_PROGRAM_SCOPE_LIMITED', 'REVENUE_HISTORY_PLATFORM_VISIBLE_ONLY',
   'REVENUE_COMPANY_SETTLEMENT_SUBJECT_SCOPE', 'REVENUE_ADDITIONAL_SETTLEMENT_ACCOUNTS_NOT_INCLUDED',
   'REVENUE_WALLET_POSTING_TIME_BASIS', 'REVENUE_WALLET_CATEGORY_LABEL_BASED']);
-const unavailable = new Set(['REVENUE_MONTH_UNAVAILABLE', 'REVENUE_MONTH_NOT_PUBLISHED', 'REVENUE_HISTORY_OUTSIDE_WINDOW',
-  'REVENUE_VIDEO_INCENTIVE_MOBILE_REQUIRED', 'REVENUE_CATEGORY_ENDPOINT_UNSUPPORTED', 'REVENUE_WALLET_UNCLASSIFIED_INCOME', 'REVENUE_CATEGORY_LIMIT']);
+const unavailable = new Set(['REVENUE_MONTH_UNAVAILABLE', 'REVENUE_MONTH_NOT_PUBLISHED', 'REVENUE_DATA_NOT_READY', 'REVENUE_SOURCE_UNAVAILABLE', 'REVENUE_WALLET_WEB_UNAVAILABLE', 'REVENUE_WALLET_REQUEST_CONTEXT_REQUIRED', 'REVENUE_HISTORY_OUTSIDE_WINDOW',
+  'REVENUE_VIDEO_INCENTIVE_MOBILE_REQUIRED', 'REVENUE_SETTLEMENT_ENTRY_UNAVAILABLE', 'REVENUE_CATEGORY_ENDPOINT_UNSUPPORTED', 'REVENUE_WALLET_UNCLASSIFIED_INCOME', 'REVENUE_CATEGORY_LIMIT']);
 const needsLogin = new Set(['LOGIN_REQUIRED', 'VERIFICATION_REQUIRED', 'REVENUE_WALLET_SESSION_REQUIRED', 'REVENUE_WALLET_LOGIN_REQUIRED',
   'REVENUE_ADDITIONAL_VERIFICATION_REQUIRED', 'REVENUE_MOBILE_AUTHORIZATION_REQUIRED', 'LOGIN_CANCELLED']);
 const codes = new Set([...informative, ...unavailable, ...needsLogin, 'ACCOUNT_CHANGED', 'PLATFORM_ACCOUNT_CHANGED', 'REVENUE_DISPOSED',
@@ -39,7 +39,9 @@ function cleanIssues(issues) {
   if (!Array.isArray(issues) || issues.length > 500) throw fault('REVENUE_SCHEMA_CHANGED');
   return issues.map(item => ({ code: safeCode(item),
     ...(typeof item.source === 'string' && /^(?:bilibili|douyin|kuaishou|wechat_channels)(?:\.[a-z_]+){1,3}$/.test(item.source) ? { source: item.source } : {}),
-    ...(item.month !== undefined ? { month: month(item.month) } : {}) }));
+    ...(item.month !== undefined ? { month: month(item.month) } : {}),
+    ...(item.latestAvailableMonth !== undefined ? { latestAvailableMonth: month(item.latestAvailableMonth) } : {}),
+    ...(item.categoryId !== undefined ? { categoryId: token(item.categoryId) } : {}) }));
 }
 function cleanState(value, bound) {
   stateKey(bound);

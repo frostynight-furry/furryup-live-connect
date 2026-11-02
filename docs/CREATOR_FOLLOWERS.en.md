@@ -72,3 +72,11 @@ The last command intercepts HTTPS with synthetic fixtures and performs no platfo
 The 2026-10-26 research inspected QianFan Sync [social-auto-upload-web-ui](https://github.com/DevilJie/social-auto-upload-web-ui/tree/fbf79a49b639a1b762e4d5c4ec48c87094e860cd) for its five-platform `sync_profile` card locations. Its root MIT file and README use restrictions differ, so no Python implementation, publisher or stealth-browser dependency was copied. F2 (Apache-2.0) was considered for Douyin, but a downloader/signing stack is unnecessary for this metric. MediaCrawler's noncommercial restrictions exclude direct product reuse; the archived bilibili-api project was not selected as a new dependency. This implementation reuses Electron sessions and existing LiveConnect Channels UA compatibility.
 
 The Channels `auth_data` field description was also checked against wordweb/Get-Tencent-Video-Live-Barrage-Gifts; none of its code was copied or executed. Own-account Kuaishou and Channels response fields were checked during host validation. Reference implementations, official page code, platform graphics and real account evidence are not redistributed. See [third-party notices](../THIRD_PARTY_NOTICES.md).
+
+## Reusing an authorized session for live collection
+
+In the Electron main process, `connectIdentity({ owner, platform })` completes the official login and returns `accountId` and `identityKind`. `identify({ owner, platform, expectedIdentity, identityKind })` silently checks the same binding. Both can verify the creator when a follower count is unavailable.
+
+For Bilibili, Douyin and Kuaishou, call `cookies.get({ url })` on `session.fromPartition(partitionFor(owner, platform, prefix))` with the platform's fixed official live HTTPS origin. Pass the applicable, unexpired cookies to `createJavaCollector({ room, cookie, ... })`, which uses stdin. Check the current host account before connecting and cancel old jobs when it changes or authorization is revoked.
+
+`WechatCollector` accepts `sharedSession()` returning `{ session, assertAuthorized, assertIdentity }`. The host owns session permissions and revocation. Both guards run synchronously and throw on revoked authorization or an unexpected finder. Stopping collection leaves the host session available for follower and revenue queries.

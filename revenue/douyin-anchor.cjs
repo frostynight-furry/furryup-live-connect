@@ -64,8 +64,13 @@ async function collectDouyinAnchorRevenue({ accountId, identityKind, request, fe
   }
   function field(meta) {
     const values = meta.field.filter(item => item.key === 'earnScore');
-    if (values.length !== 1 || typeof values[0].unit !== 'string' || !values[0].unit.trim()) throw fault('REVENUE_UNIT_UNAVAILABLE');
-    return { name: label(values[0].title) || 'earnScore', unit: values[0].unit.trim() };
+    if (values.length !== 1 || typeof values[0].unit !== 'string') throw fault('REVENUE_UNIT_UNAVAILABLE');
+    const name = label(values[0].title).trim();
+    // The live dashboard explicitly labels earnScore “收获音浪” while sending
+    // an empty unit. Only this verified label may supply that native unit.
+    const unit = values[0].unit.trim() || (name === '收获音浪' ? '音浪' : '');
+    if (!unit) throw fault('REVENUE_UNIT_UNAVAILABLE');
+    return { name: name || 'earnScore', unit };
   }
   function observe(value, info, range, daily = false) {
     const raw = decimal(value), common = { scope: 'douyin.anchor', categoryId: 'earnScore', categoryName: info.name,
@@ -100,7 +105,8 @@ async function collectDouyinAnchorRevenue({ accountId, identityKind, request, fe
   });
   if (dataAsOf) await read('trend', ranges[2], data => {
     const meta = metadata(data), info = field(meta);
-    const axis = Array.isArray(meta.categoryAxis) && meta.categoryAxis.length === 1 ? meta.categoryAxis[0] : null;
+    const candidate = Array.isArray(meta.categoryAxis) && meta.categoryAxis.length === 1 ? meta.categoryAxis[0] : null;
+    const axis = Array.isArray(candidate) && candidate.length === 1 ? candidate[0] : candidate;
     if (typeof axis !== 'string') throw fault('REVENUE_DATE_UNAVAILABLE');
     token(axis); const rows = new Map();
     for (const item of data.data.series) {

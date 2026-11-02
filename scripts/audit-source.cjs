@@ -45,10 +45,10 @@ const allowed = new Set([
   'scripts/audit-source.cjs', 'scripts/build-java.cjs', 'scripts/java-runtime.cjs', 'scripts/test.cjs', 'scripts/test-java.cjs'
 ]);
 for (const name of ['UserBadges', 'BilibiliExtraEvents', 'BilibiliGiftV2', 'BilibiliInteractV2', 'Collector', 'ConnectionFailure', 'DouyinPkScores',
-  'BilibiliAuthenticatedClient', 'DouyinAuthenticatedClient', 'KuaishouAvatarCache', 'KuaishouExtraEvents', 'MessageEmotes', 'PkEvents', 'ViewerSnapshots'])
+  'BilibiliAudience', 'BilibiliAuthenticatedClient', 'DouyinAuthenticatedClient', 'KuaishouAvatarCache', 'KuaishouExtraEvents', 'KuaishouGiftPrices', 'MessageEmotes', 'PkEvents', 'ViewerSnapshots'])
   allowed.add(`collector/src/main/java/local/furryup/${name}.java`);
-for (const name of ['UserBadges', 'BilibiliHandshake', 'BilibiliGiftCombo', 'BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',
-  'ExpandedEvent', 'KuaishouAvatar', 'KuaishouExtraEvents', 'PkEvents', 'PlatformEvent', 'ViewerSnapshots'])
+for (const name of ['UserBadges', 'BilibiliAudience', 'BilibiliHandshake', 'BilibiliGiftCombo', 'BilibiliExtraEvents', 'BilibiliGiftMetadata', 'BilibiliMainInteractions', 'BilibiliV2', 'CollectorWire', 'DouyinHandshake',
+  'ExpandedEvent', 'KuaishouAvatar', 'KuaishouExtraEvents', 'KuaishouGiftPrices', 'PkEvents', 'PlatformEvent', 'ViewerSnapshots'])
   allowed.add(`collector/src/test/java/local/furryup/${name}Fixture.java`);
 const skipped = new Set(['.git', 'node_modules', 'collector/target']);
 function auditBytes(name, body) {
