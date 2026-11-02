@@ -1,39 +1,38 @@
 # FurryUP LiveConnect
 
-[中文](README.md) · [API reference (中文)](docs/API.md) · [Troubleshooting (中文)](docs/TROUBLESHOOTING.md) · [Roadmap (中文)](docs/ROADMAP.md)
+**Multi-platform livestream and creator data for Node.js and Electron.** Subscribe to live events, compare follower snapshots, or build a calendar-month income view. LiveConnect covers five platforms. Its three modules can be integrated independently under the MIT license.
 
-[![Release](https://img.shields.io/github/v/release/frostynight-furry/furryup-live-connect)](https://github.com/frostynight-furry/furryup-live-connect/releases/latest)
+[中文](README.md) · [Offline demo](#try-the-offline-demo) · [Developer API](docs/API.md) · [FurryUP Studio downloads](https://github.com/frostynight-furry/furryup-studio-releases)
 
-**A developer component for multi-platform livestream data, continuing as MIT open source.** Connect Bilibili, Douyin, Kuaishou and WeChat Channels through a shared event API, with message-local sender badges, avatars and gift metadata. Includes a versioned event contract, synthetic replay tools and independent profile/follower adapters. Integrate it into your own chat tools, live assistants, desktop pets or OBS components; capabilities vary by platform.
+## Platform coverage
 
-Source version **0.9.0** · MIT · Node.js **22.12+**. Tagged source snapshots are available on [GitHub Releases](https://github.com/frostynight-furry/furryup-live-connect/releases).
+| Platform | Live events | Profiles and followers | Creator revenue |
+| --- | --- | --- | --- |
+| Bilibili | Java collector | Creator session or opt-in public profile | Monthly reports and recent daily data |
+| Douyin | Java collector | Creator session or configured profile reader | Creator income and anchor analytics. Wallet verification is separate. |
+| Kuaishou | Java collector | Creator session or authorized API | Video incentive settlements and live trends |
+| WeChat Channels | Authorized Electron live dashboard | Creator session | Account overview and eligible live settlements |
+| Xiaohongshu | — | Public profile and creator-session adapters. Real-account collection awaits verification. | — |
 
-| Capability | Current scope |
-| --- | --- |
-| Four live platforms | Bilibili, Douyin, Kuaishou and WeChat Channels; shared subscriptions, deduplication and bounded avatar caching; supported events vary |
-| Multiple sender badges | Message-local `user_badges` with explicitly sourced roles, fans medals, levels and membership labels |
-| Event contract and replay | schemaVersion 1, JSON Schema, synthetic examples and duplicate/out-of-order, room-switch and reconnect regressions |
-| Profiles and followers | Separate module also recognizes Xiaohongshu; new authenticated creator-center Electron sessions, alongside existing public/OAuth/manual clients; no Xiaohongshu live collector |
-| Creator revenue | Four-platform synchronization, monthly coverage, account-level metrics and normalized CSV import |
+The source on this branch is **0.9.0**. The three Java collectors reuse OrdinaryRoad 1.5.8. Channels uses a local authorized Electron session. Follower snapshots distinguish exact and rounded counts. Revenue keeps missing periods, balances, lifetime amounts and platform-native units distinct. [Follower adapters](docs/CREATOR_FOLLOWERS.en.md) · [Revenue](docs/CREATOR_REVENUE.en.md) · [Automatic sync](docs/REVENUE_SYNC.en.md) · [Douyin wallet](docs/DOUYIN_WALLET.en.md) · [Tagged source](https://github.com/frostynight-furry/furryup-live-connect/releases)
 
-0.7.3 repairs Bilibili web authentication fields and compression negotiation. Actual SDK offline replays verify twenty individual or batched gifts, duplicate transactions and cumulative combo notifications without double-counting. The four-platform sender badges from 0.7.2 remain available; event `schemaVersion` stays at 1. See the [changelog](CHANGELOG.en.md) and [event contract](docs/EVENTS.en.md). Offline checks do not establish real-account delivery or sustained live-platform acceptance.
+## See the results
 
-Created and maintained by [FrostyNight (夜霜)](https://github.com/frostynight-furry), LiveConnect grew out of FurryUP Studio's livestream integration and is available as a standalone component for developers.
+These screenshots arrange the bundled demos' actual output by platform. Four synthetic rooms produce 12 accepted events with four duplicate deliveries filtered. The public profile demo also returns explicit authorization or manual states. [Event demo](examples/offline-demo.cjs) · [Profile demo](examples/profile-demo.cjs)
 
-- **Streamers looking for the complete application:** [Explore FurryUP Studio](https://frostynight.top/furryup) · [Downloads and release notes](https://github.com/frostynight-furry/furryup-studio-releases).
-- **Developers integrating the component:** [Try the offline demo](#try-the-offline-demo) · [API reference (中文)](docs/API.md). The component works independently.
+![Offline demo output showing four live event streams and five platform profile results with their availability](docs/images/live-and-followers.png)
 
-New [creator-center collection](docs/CREATOR_FOLLOWERS.en.md) supports isolated local sessions, exact versus rounded values, login recovery and account identity checks. The originating implementation passed real reads and fresh-process reuse for Bilibili, Douyin, Kuaishou and Channels; Xiaohongshu remains synthetic-only. Extracted-component tests are synthetic; see the documented validation limits.
+In the revenue fixture, Bilibili's full monthly report and its two observed trend days have different coverage. Douyin's CNY values and its native live engagement unit have separate series. [Revenue demo](examples/revenue-demo.cjs)
 
-The official Channels catalog returns account-level lifetime income and withdrawable balances in CNY cents. The ledger stores these under `wechat_channels.catalog` as `income/lifetime` and `balance/current`. Daily and monthly video incentive details require mobile verification. Live monthly bills also require an initialized settlement subject. Unavailable months remain missing.
+![Synthetic September ledger showing full or partial calendar-month coverage and CNY or native units for each source](docs/images/monthly-revenue.png)
 
-Bilibili checks the latest published report before querying historical months. Douyin preserves CNY and native Yinlang separately. Kuaishou retains fractional-cent daily observations through monthly aggregation. [Revenue integration](docs/CREATOR_REVENUE.en.md)
+## Architecture
 
-For the unchanged public-profile client, see [Profiles and followers (中文)](docs/PROFILES.md) for the standalone module. Bilibili/Xiaohongshu public adapters are opt-in and experimental; Douyin supports a host-supplied browser reader; Douyin/Kuaishou also offer optional server OAuth; Channels remains manual. Five recognized platforms do not imply five automatic count APIs. `npm run demo:profiles` runs a synthetic offline example; `npm run test:profiles` runs its regression tests.
+The three Java platforms and the Channels Electron collector feed the `core` event subscription. The `profiles` module verifies account identity and returns follower snapshots. The `revenue` module normalizes period records into a source-aware ledger. Host applications own their charts, accounts and cloud storage.
 
-[Four-platform automatic sync](docs/REVENUE_SYNC.en.md) adds independent source pauses, bounded backfill, monthly persistence, old-ledger migration and restart recovery. `npm run start:revenue:sync -- all --watch` refreshes visible platform data while the host runs. Missing data is not zero, and unavailable historical data cannot be recovered.
+![Platform adapters feed event subscriptions, follower snapshots and source-aware revenue history for the host application](docs/images/architecture.svg)
 
-A verified Douyin creator web session received 20003 (not logged in) from the wallet origin used by the official app. The experimental web route can return 10011 for missing app context. Creator income and anchor analytics sync independently. The Android wallet reader still needs real-device bill verification. [Wallet integration](docs/DOUYIN_WALLET.en.md)
+[Event fields](docs/EVENTS.en.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Showcase](docs/SHOWCASE.md) · [Changelog](CHANGELOG.en.md)
 
 ## Event contract and replay tools
 

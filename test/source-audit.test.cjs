@@ -7,6 +7,15 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { auditBytes, auditSource } = require('../scripts/audit-source.cjs');
 
+test('only the two reviewed offline demo captures pass as binary documentation', () => {
+  for (const name of ['docs/images/live-and-followers.png','docs/images/monthly-revenue.png']) {
+    const bytes = fs.readFileSync(path.join(__dirname,'..',name));
+    assert.deepEqual(auditBytes(name,bytes),[]);
+    assert.ok(auditBytes(name,Buffer.concat([bytes,Buffer.from('extra')])).length);
+    assert.ok(auditBytes('docs/images/other.png',bytes).length);
+  }
+});
+
 test('source byte checks reject binary, token, local-path and private-runtime imports', () => {
   const samples = [Buffer.from([0xff]), Buffer.from('bad\0binary'),
     Buffer.from('gh' + 'p_' + 'x'.repeat(36)), Buffer.from('C:/' + 'Users/synthetic/private'),

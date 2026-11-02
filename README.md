@@ -5,44 +5,39 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A522.12-43853d.svg)](package.json)
 [![Release](https://img.shields.io/github/v/release/frostynight-furry/furryup-live-connect)](https://github.com/frostynight-furry/furryup-live-connect/releases/latest)
 
-**面向开发者的多平台直播数据接入组件，持续以 MIT 许可证开源。** 用统一事件接口接入 B站、抖音、快手和视频号，支持消息中的观众头衔、头像与礼物元数据，并提供事件规范、合成回放及独立的五平台主页／粉丝数接口。可用于自己的弹幕工具、直播助手、桌宠或 OBS 组件；各平台支持范围见下方能力表。
+**多平台直播与创作者数据采集组件。** 在自己的应用里订阅弹幕和礼物、比较粉丝变化，或按自然月核对创作者收益。LiveConnect 覆盖五个平台，提供可独立使用的 Node.js / Electron 接口，采用 MIT 许可证。
 
-Four-platform livestream events, a versioned contract and offline replay tools, plus independent five-platform profile/follower adapters. MIT licensed; platform-specific limits apply.
+[English](README.en.md) · [离线示例](#先跑一个离线示例) · [开发者 API](docs/API.md) · [主播端下载](https://github.com/frostynight-furry/furryup-studio-releases)
 
-由[夜霜（FrostyNight）](https://github.com/frostynight-furry)发起并维护，源自 FurryUP Studio 的直播接入能力，面向希望自行开发和集成的开发者。
+## 五个平台分别支持什么
 
-- **主播直接使用完整产品：** [了解 FurryUP Studio](https://frostynight.top/furryup) · [下载与版本说明](https://github.com/frostynight-furry/furryup-studio-releases)。
-- **开发者集成组件：** [先跑一个离线示例](#先跑一个离线示例) · [API 文档](docs/API.md)。组件可以独立使用。
+| 平台 | 直播事件 | 主页与粉丝 | 创作者收益 |
+| --- | --- | --- | --- |
+| 哔哩哔哩 | Java 采集 | 本人后台，可选公开主页 | 创作者月报与近期明细 |
+| 抖音 | Java 采集 | 本人后台，可选主页读取 | 创作者收益、直播分析，钱包单独验证 |
+| 快手 | Java 采集 | 本人后台，可选授权接口 | 视频激励结算与直播趋势 |
+| 微信视频号 | Electron 本人直播后台 | 本人后台 | 账户概览，按账号条件读取直播结算 |
+| 小红书 | — | 主页与本人后台适配，实际账号读取待验证 | — |
 
-[FurryUP 官网](https://frostynight.top/furryup) · [FurryUP Studio 下载](https://github.com/frostynight-furry/furryup-studio-releases) · [FurryUP 桌宠](https://github.com/frostynight-furry/furryup-desktop-pet-releases) · [参与贡献](CONTRIBUTING.md)
+当前开发源码为 **0.9.0**。三种 Java 采集器复用 OrdinaryRoad 1.5.8。视频号通过本机已授权的 Electron 会话采集。粉丝接口会区分准确计数、约数和验证状态。平台未返回的收益保留为空，累计收入、可提现余额和音浪单列。[粉丝采集](docs/CREATOR_FOLLOWERS.md) · [收益接入](docs/CREATOR_REVENUE.md) · [自动同步](docs/REVENUE_SYNC.md) · [抖音钱包](docs/DOUYIN_WALLET.md) · [已发行源码](https://github.com/frostynight-furry/furryup-live-connect/releases)
 
-[English](README.en.md) · [API 文档](docs/API.md) · [排错指南](docs/TROUBLESHOOTING.md) · [路线图](docs/ROADMAP.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
+## 看一次采集结果
 
-当前源码版本 **0.9.0**，正式源码发行见 [GitHub Releases](https://github.com/frostynight-furry/furryup-live-connect/releases)。三平台 Java 采集使用 OrdinaryRoad 1.5.8，视频号使用 Electron 授权会话。
+下图将仓库离线示例的实际输出按平台排版。四个直播间共送入 12 条有效事件，另有 4 条重复事件被过滤。右栏展示公开主页示例在不同平台返回的状态。[直播示例](examples/offline-demo.cjs) · [主页示例](examples/profile-demo.cjs)
 
-| 能力 | 当前范围 |
-| --- | --- |
-| 四平台直播接入 | B站、抖音、快手、视频号；统一订阅、消息去重与有界头像缓存，事件覆盖按平台区分 |
-| 观众多头衔 | 随当前消息传递 `user_badges`，包含有明确来源的角色、粉丝牌、等级及守护等标记 |
-| 事件规范与回放 | schemaVersion 1、JSON Schema、四平台合成示例，以及重复／乱序、切房和重连回归 |
-| 主页与粉丝数 | 独立模块另含小红书；新增本人创作者后台 Electron 会话采集，原实验公开／OAuth／手动接口保留；小红书无直播采集 |
-| 创作者收益 | 四平台收益同步、月份覆盖、账户概览和规范化 CSV 补录。各来源的单位与覆盖范围独立保存 |
+![直播事件和五平台主页离线示例，按平台列出礼物数量、重复事件和粉丝读取状态](docs/images/live-and-followers.png)
 
-0.7.3 修复哔哩哔哩网页认证字段和压缩协商，并增加 20 个礼物的真实 SDK 离线回放，验证逐笔与批量礼物、重复通知及连击累计提示不会重复计数。保留 0.7.2 的四平台多头衔能力，事件 `schemaVersion` 仍为 1。详见[更新记录](CHANGELOG.md)与[字段规范](docs/EVENTS.md)；离线验证不代表真实账号接收或四平台长时实播已通过。
+收益示例中，同一个 B站月报有完整月份，趋势接口只覆盖其中两天。查看趋势时可以直接看到缺了多少天。同一个抖音账号的人民币收益和直播音浪保留各自单位。[自然月收益示例](examples/revenue-demo.cjs)
 
-新增 [本人创作者后台采集](docs/CREATOR_FOLLOWERS.md)：B站、抖音、快手、视频号的来源实现已通过本人真实读取与重启复验；小红书仅合成验证。支持账号隔离、精确／近似值、登录回跳和身份核对，不需要完整客户端。组件提取后的验收为合成测试，实测边界详见文档。
+![合成月账本，展示同月不同来源、人民币与音浪单位，以及各来源覆盖天数](docs/images/monthly-revenue.png)
 
-视频号的官方收益概览提供账户累计收入和可提现余额。`wechat_channels.catalog` 使用人民币分，`income/lifetime` 与 `balance/current` 单独保存。逐日和逐月创作分成需要手机侧验证。直播月账单还需要可用的结算主体，缺少账单的月份保留为空。
+## 组件架构
 
-B站月报先查最新已公布月份。抖音人民币收益和音浪分别存储。快手直播趋势保留平台返回的小数精度，按月汇总后再显示人民币分。[收益接入说明](docs/CREATOR_REVENUE.md)
+直播事件通过 `core` 订阅，粉丝快照通过 `profiles` 获取，收益通过 `revenue` 生成自然月账本。宿主可以只选用其中一路，按需接入自己的图表、账号和云存储。
 
-原公开主页接口的粉丝数能力按平台区分：B站公开接口、小红书公开主页为需显式开启的实验适配；抖音新增宿主浏览器公开主页读取，抖音/快手另有可选官方授权流程；视频号保留手动模式。五个平台均有明确的识别/状态接口，不代表五个平台都能仅凭链接自动获取。运行 `npm run demo:profiles` 查看不联网的合成示例，运行 `npm run test:profiles` 验证新模块。
+![LiveConnect 数据流：四平台直播进入事件订阅，五平台主页进入粉丝快照，四平台收益进入按自然月整理的账本](docs/images/architecture.svg)
 
-本目录通过 Maven 使用 OrdinaryRoad 已发布的三个模块，**没有复制完整 OrdinaryRoad 项目，也不是它的官方维护仓库**。FurryUP Studio 主程序、插件管理器、账户服务、直播助手、弹幕气泡和礼物特效不在拆分范围内。
-
-[四平台自动同步](docs/REVENUE_SYNC.md)已加入来源独立暂停、分批回查、逐月保存、旧账本迁移和重启恢复。运行 `npm run start:revenue:sync -- all --watch`，在应用运行期间刷新并保存各来源可见的月份；缺失数据不算零收入，不承诺恢复平台未开放的历史。
-
-使用已验证的抖音创作者网页会话访问官方 App 的钱包域时，平台返回未登录（20003）。现有网页入口还可能返回缺少应用上下文（10011）。普通创作者收益与直播分析可继续独立同步。安卓官方 WebView 钱包读取仍待真机账单验收。 [钱包说明](docs/DOUYIN_WALLET.md)
+[事件字段](docs/EVENTS.md) · [排错指南](docs/TROUBLESHOOTING.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
 ## 事件规范与测试工具
 
@@ -79,16 +74,6 @@ npm run demo
 | 排查环境、登录、断线和头像 | [排错指南](docs/TROUBLESHOOTING.md) |
 | 直接使用完整主播端产品 | [FurryUP Studio](https://github.com/frostynight-furry/furryup-studio-releases) |
 
-```mermaid
-flowchart LR
-  B[哔哩哔哩] --> J[Java 采集器]
-  D[抖音] --> J
-  K[快手] --> J
-  W[视频号授权后台] --> E[Electron 采集器]
-  J --> C[统一事件与订阅]
-  E --> C
-  C --> T[你的弹幕工具 / 桌宠 / OBS 组件]
-```
 
 ## 接入范围
 

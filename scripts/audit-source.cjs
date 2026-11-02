@@ -3,7 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
+// Only these reviewed demo captures may bypass the text-source check.
+const captures = new Map([
+  ['docs/images/live-and-followers.png','42abc1667c40f0c309b6f7a94de403e858f8f9d4262e63f1d55faedd2108ee1b'],
+  ['docs/images/monthly-revenue.png','69933a0d8ed91e74da6cd2fcb9026fc7242177a0d71a955d2474ba895ea430b4']
+]);
 const allowed = new Set([
+  ...captures.keys(), 'docs/images/architecture.svg',
   'revenue/index.cjs', 'revenue/model.cjs', 'revenue/ledger.cjs', 'revenue/adapters.cjs', 'revenue/creator-electron.cjs',
   'revenue/douyin-anchor.cjs', 'test/revenue-anchor.test.cjs',
   'revenue/douyin-wallet.cjs', 'revenue/wallet-statement.cjs', 'revenue/wallet-sync.cjs',
@@ -52,6 +58,10 @@ for (const name of ['UserBadges', 'BilibiliAudience', 'BilibiliHandshake', 'Bili
   allowed.add(`collector/src/test/java/local/furryup/${name}Fixture.java`);
 const skipped = new Set(['.git', 'node_modules', 'collector/target']);
 function auditBytes(name, body) {
+  if (captures.has(name)) {
+    const digest = createHash('sha256').update(body).digest('hex');
+    return digest === captures.get(name) ? [] : ['Unreviewed screenshot bytes'];
+  }
   const findings = [];
   let text;
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(body); }
@@ -109,7 +119,7 @@ if (require.main === module) {
   try {
     const { findings, inventory } = auditSource(root, { tracked: process.argv.includes('--tracked') });
     if (findings.length) { console.error(findings.join('\n')); process.exitCode = 1; }
-    else console.log(`PASS source allowlist: ${inventory.length} UTF-8 files; no detected binaries, links, private imports, local user paths or token material.`);
+    else console.log(`PASS source allowlist: ${inventory.length} files, including ${captures.size} hash-verified demo screenshots.`);
     if (process.argv.includes('--inventory')) console.log(JSON.stringify(inventory, null, 2));
   } catch {
     console.error('Source audit could not complete; publication is blocked.');
