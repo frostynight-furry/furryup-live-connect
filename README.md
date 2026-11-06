@@ -23,19 +23,19 @@
 
 ## 看一次采集结果
 
-下图将仓库离线示例的实际输出按平台排版。四个直播间共送入 12 条有效事件，另有 4 条重复事件被过滤。右栏展示公开主页示例在不同平台返回的状态。[直播示例](examples/offline-demo.cjs) · [主页示例](examples/profile-demo.cjs)
+下图将仓库离线示例的实际输出与 0.9.0 四平台协议增强字段按平台排版。四个直播间共送入 12 条有效合成事件，另有 4 条重复事件被过滤，并同步展示大航海（`guardLevel`）、财富/粉丝牌等级、礼物单价兜底与在线快照能力。右栏展示公开主页示例在不同平台返回的状态。全部演示均采用 `synthetic-*` 脱敏合成数据，不含任何真实房间或观众信息。[直播示例](examples/offline-demo.cjs) · [主页示例](examples/profile-demo.cjs)
 
-![直播事件和五平台主页离线示例，按平台列出礼物数量、重复事件和粉丝读取状态](docs/images/live-and-followers.png)
+![直播事件、0.9.0 协议增强字段与五平台主页离线示例（离线合成脱敏数据）](docs/images/live-and-followers.png)
 
-收益示例中，同一个 B站月报有完整月份，趋势接口只覆盖其中两天。查看趋势时可以直接看到缺了多少天。同一个抖音账号的人民币收益和直播音浪保留各自单位。[自然月收益示例](examples/revenue-demo.cjs)
+收益示例中，同一个 B站月报有完整月份，趋势接口只覆盖其中两天。查看趋势时可以直接看到缺了多少天。同一个抖音账号的人民币收益和直播音浪保留各自单位，仅演示开源账本归集结构，不含真实创作者流水或商业分成模型。[自然月收益示例](examples/revenue-demo.cjs)
 
-![合成月账本，展示同月不同来源、人民币与音浪单位，以及各来源覆盖天数](docs/images/monthly-revenue.png)
+![合成月账本，展示同月不同来源、人民币与音浪单位，以及各来源覆盖天数（脱敏演示）](docs/images/monthly-revenue.png)
 
-## 组件架构
+## 组件架构与隐私商业边界
 
-直播事件通过 `core` 订阅，粉丝快照通过 `profiles` 获取，收益通过 `revenue` 生成自然月账本。宿主可以只选用其中一路，按需接入自己的图表、账号和云存储。
+直播事件通过 `core` 订阅，粉丝快照通过 `profiles` 获取，收益通过 `revenue` 生成自然月账本。平台登录态与 Cookie 仅留存采集设备本机；专属进房欢迎特效、Live2D 动作规则、多源交叉核验与智能助播策略均由闭源宿主独立实现，不在本开源仓库公开。
 
-![LiveConnect 数据流：四平台直播进入事件订阅，五平台主页进入粉丝快照，四平台收益进入按自然月整理的账本](docs/images/architecture.svg)
+![LiveConnect 0.9.0 数据流与隐私商业隔离边界](docs/images/architecture.svg)
 
 [事件字段](docs/EVENTS.md) · [排错指南](docs/TROUBLESHOOTING.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 
@@ -245,9 +245,7 @@ FurryUP Studio 将直播工作台、互动与 OBS 配合等工作流集中到桌
 
 **想自己开发：** 使用 LiveConnect 接入你的工具箱，欢迎反馈和贡献协议修复。**想直接开播使用：** [FurryUP Studio](https://github.com/frostynight-furry/furryup-studio-releases) 提供完整主播端产品，[FurryUP 桌宠](https://github.com/frostynight-furry/furryup-desktop-pet-releases) 提供桌面陪伴体验。开源底层能力与 FurryUP 产品持续共同迭代。
 
-下面展示 FurryUP Studio 官方下载仓库已公开的工作台界面，使用示例消息；它展示完整产品的应用方式，不是 LiveConnect 附带的界面。图片和品牌不纳入本仓库源码的 MIT 许可。
-
-[![FurryUP Studio 四平台工作台，使用示例消息](https://raw.githubusercontent.com/frostynight-furry/furryup-studio-releases/main/assets/screenshots/live-workbench.png)](https://github.com/frostynight-furry/furryup-studio-releases#界面预览)
+为保护用户隐私与产品商业机密，本仓库所有文档截图、测试 fixture 与架构图均采用离线合成数据（`synthetic-*`），不包含任何真实账号、观众记录或闭源宿主界面截图。完整主播端产品说明见 [FurryUP Studio 发行页](https://github.com/frostynight-furry/furryup-studio-releases)；产品品牌与闭源能力不纳入本仓库源码的 MIT 许可。
 
 做出了自己的工具？欢迎按[案例提交说明](docs/SHOWCASE.md)提供公开项目链接。我们会区分官方产品和独立社区项目，不将未接入的项目标记为用户案例。
 

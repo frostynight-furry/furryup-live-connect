@@ -126,19 +126,19 @@ const recent = live.history({ eventTypes: ['comment'] });
 
 快手 Java 采集器在官方本场礼物目录可用时提供单件价格，币种为 `kuaibi`（快币）；该价格与 `gift_count` 分开，不乘以连送数量。价格字段缺失代表未知，不代表免费或零价格。目录在连接前预载并定期刷新，过期或平台限制时不推测价格，其他事件继续采集。
 
-价格在核心中规范为十进制**字符串**，保留平台语义。B站普通礼物的 `bilibili_coin` 及 `gift_coin_type`、抖音的 `diamond` 取已知原始单位价格；视频号 `wechat_bean` 来自奖励消息的 `reward_amount_in_wecoin`，保留交易金额语义，不能统一再乘一次数量。B站醒目留言 `cny` 是该消息的原始金额。缺失价格、币种和图片都不会凭空补齐，也不换算跨平台收入。
+价格在核心中规范为十进制**字符串**，保留平台语义。B站普通礼物的 `bilibili_coin` 及 `gift_coin_type`、抖音的 `diamond` 取已知原始单位价格；视频号 `wechat_bean` 优先来自奖励消息的 `reward_amount_in_wecoin`，缺失时按 `reward_gift.price * reward_product_count` 兜底计算，均保留本条交易总金额语义，不能统一再乘一次数量。B站醒目留言 `cny` 是该消息的原始金额。缺失价格、币种和图片都不会凭空补齐，也不换算跨平台收入。
 
 快手、抖音礼物保留 SDK 已计算的增量，不把每条连击的显示总数再次累计。视频号只把已确认的奖励消息计作礼物，忽略连击总数通知的重复计数。
 
 ### 观众与 PK 快照
 
-`viewer_snapshot` 包含 `source`、`presenceEvidence`、`complete`、可选 `revision` 和 `viewers`。每个观众可有 `userId`、`userName`、`userLevel`、`wealthLevel`、`online`、`highWealth`，以及合法的 `avatarUrl` / `avatarId` 和有来源依据的 `rank`（`1–500`）。缺失头像或名次不会补造，数组下标不是平台排名。
+`viewer_snapshot` 包含 `source`、`presenceEvidence`、`complete`、可选 `revision` 和 `viewers`。每个观众可有 `userId`、`userName`、`userLevel`、`wealthLevel`、`guardLevel`（`1 | 2 | 3`）、`online`、`highWealth`，以及合法的 `avatarUrl` / `avatarId` 和有来源依据的 `rank`（`1–500`）。缺失头像或名次不会补造，数组下标不是平台排名。
 
 | 来源 | `source` / `presenceEvidence` | 实际范围 |
 | --- | --- | --- |
 | 快手 socket `340` | `kuaishou-live-watching-list` / `online-list` | 平台可见观众片段；保留明确的 `offline` 反向状态及 `tuhao` 标记，排除隐藏或占位身份 |
 | 抖音 `ranksList` | `douyin-contributor-rank` / `unknown` | 部分贡献榜，保留明确名次；不证明上榜用户此刻仍在线，不包含所有座位 |
-| 视频号后台 `online_member` | `wechat-online-member` / `online-list` | 后台本次返回的 `liveContacts`；只在当前房间已由消息确认后接收最新请求的名单 |
+| 视频号后台 `online_member` | `wechat-online-member` / `online-list` | 后台本次返回的 `liveContacts`（含 `online: true`、`badge_type=2` 财富等级与 `badge_type=4` 粉丝团等级）；只在当前房间已由消息确认后接收最新请求的名单 |
 
 上述来源均为 `complete=false`，没有全量分页完成保证。视频号条目可能只有显示昵称和头像，没有可靠 `userId`；这种条目可供本次名单展示，不能按昵称连接到弹幕身份。名单不会产生 `enter` / `follow` / 离场事件，也不会自动填充弹幕的身份头像缓存。缺失、消失或过期的条目不能证明完整离场，更不能由此计算所有人的精确停留时间。
 

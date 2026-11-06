@@ -18,19 +18,19 @@ The source on this branch is **0.9.0**. The three Java collectors reuse Ordinary
 
 ## See the results
 
-These screenshots arrange the bundled demos' actual output by platform. Four synthetic rooms produce 12 accepted events with four duplicate deliveries filtered. The public profile demo also returns explicit authorization or manual states. [Event demo](examples/offline-demo.cjs) · [Profile demo](examples/profile-demo.cjs)
+These screenshots arrange the bundled demos' output alongside the 0.9.0 protocol enhancements by platform. Four synthetic rooms produce 12 accepted events with four duplicate deliveries filtered, while highlighting normalized guard/wealth/fan badge levels, gift unit-price fallback and online viewer snapshots. The public profile demo returns explicit authorization or manual states. All visuals use `synthetic-*` fixtures with zero real accounts or audience records. [Event demo](examples/offline-demo.cjs) · [Profile demo](examples/profile-demo.cjs)
 
-![Offline demo output showing four live event streams and five platform profile results with their availability](docs/images/live-and-followers.png)
+![Offline demo output showing four live event streams, 0.9.0 badge/snapshot capabilities and five platform profile results](docs/images/live-and-followers.png)
 
-In the revenue fixture, Bilibili's full monthly report and its two observed trend days have different coverage. Douyin's CNY values and its native live engagement unit have separate series. [Revenue demo](examples/revenue-demo.cjs)
+In the revenue fixture, Bilibili's full monthly report and its two observed trend days have different coverage. Douyin's CNY values and its native live engagement unit have separate series, illustrating the open-source ledger structure without real creator statements or proprietary revenue rules. [Revenue demo](examples/revenue-demo.cjs)
 
 ![Synthetic September ledger showing full or partial calendar-month coverage and CNY or native units for each source](docs/images/monthly-revenue.png)
 
-## Architecture
+## Architecture and privacy/commercial boundary
 
-The three Java platforms and the Channels Electron collector feed the `core` event subscription. The `profiles` module verifies account identity and returns follower snapshots. The `revenue` module normalizes period records into a source-aware ledger. Host applications own their charts, accounts and cloud storage.
+The three Java platforms and the Channels Electron collector feed the `core` event subscription. The `profiles` module verifies account identity and returns follower snapshots. The `revenue` module normalizes period records into a source-aware ledger. Login sessions remain on the local device; proprietary welcome effects, Live2D interaction rules, cross-verified audience synthesis and PK coaching belong to closed-source host applications.
 
-![Platform adapters feed event subscriptions, follower snapshots and source-aware revenue history for the host application](docs/images/architecture.svg)
+![Platform adapters feed event subscriptions, follower snapshots and source-aware revenue history with explicit privacy and commercial boundaries](docs/images/architecture.svg)
 
 [Event fields](docs/EVENTS.en.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Showcase](docs/SHOWCASE.md) · [Changelog](CHANGELOG.en.md)
 

@@ -1,39 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1056 490" role="img" aria-labelledby="title desc">
-  <title id="title">FurryUP LiveConnect 0.9.0 多平台采集架构</title>
-  <desc id="desc">直播使用三个 Java 平台和一个视频号 Electron 采集器，进入统一事件订阅。五平台主页和创作者后台进入粉丝读取模块。四平台收益进入按来源和单位分开的账本。展示、账号和跨设备存储由宿主应用负责。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1056 520" role="img" aria-labelledby="title desc">
+  <title id="title">FurryUP LiveConnect 0.9.0 多平台采集架构与隐私商业隔离边界</title>
+  <desc id="desc">直播使用三个 Java 平台和一个视频号 Electron 采集器，进入统一事件订阅（含礼物单价回退、粉丝牌与大航海等级、在线观众及双人 PK 快照）。五平台主页和创作者后台进入粉丝读取模块。四平台收益进入按来源和单位分开的账本。本机凭据不外传，测试与截图均使用离线合成数据；专属特效、Live2D 编排与智能助播等商业机密由闭源宿主独立实现。</desc>
   <defs>
     <marker id="tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="#618298"/></marker>
     <style>
-      text{font-family:system-ui,"Microsoft YaHei",sans-serif;fill:#233a50}.title{font-size:28px;font-weight:700}.kicker{font-size:13px;font-weight:650;letter-spacing:1px;fill:#486777}.col{font-size:15px;font-weight:650;fill:#4b677a}.card{fill:#fff;stroke:#cbd9e3}.module{fill:#eaf4fa;stroke:#abcddd}.head{font-size:19px;font-weight:650}.body{font-size:15px;fill:#415767}.code{font-family:ui-monospace,Consolas,monospace;font-size:17px;font-weight:650}.arrow{fill:none;stroke:#618298;stroke-width:2;marker-end:url(#tip)}.foot{font-size:15px;fill:#466476}
+      text{font-family:system-ui,"Microsoft YaHei",sans-serif;fill:#233a50}.title{font-size:26px;font-weight:700}.kicker{font-size:13px;font-weight:650;letter-spacing:.8px;fill:#486777}.badge{fill:#e4f4ec;stroke:#b7dec9}.badge-text{font-size:12.5px;font-weight:650;fill:#1f6445}.col{font-size:14.5px;font-weight:650;fill:#4b677a}.card{fill:#fff;stroke:#cbd9e3}.module{fill:#eaf4fa;stroke:#abcddd}.host{fill:#fcfdfe;stroke:#cbd9e3;stroke-dasharray:5 3}.head{font-size:18px;font-weight:650}.body{font-size:13.5px;fill:#415767}.muted{font-size:12.5px;fill:#5b7384}.code{font-family:ui-monospace,Consolas,monospace;font-size:16px;font-weight:650}.arrow{fill:none;stroke:#618298;stroke-width:2;marker-end:url(#tip)}.guard{fill:#edf3f7;stroke:#c6d6e2}.foot-title{font-size:13px;font-weight:700;fill:#2c475d}.foot{font-size:12.5px;fill:#466476}
     </style>
   </defs>
-  <rect width="1056" height="490" rx="16" fill="#f3f7fa"/>
-  <text class="kicker" x="28" y="35">FurryUP LiveConnect　/　0.9.0</text>
-  <text class="title" x="28" y="75">从平台数据到宿主应用</text>
-  <text class="col" x="28" y="119">01　平台与采集来源</text>
-  <text class="col" x="402" y="119">02　开源组件</text>
-  <text class="col" x="777" y="119">03　宿主读取与使用</text>
-  <g transform="translate(0 139)">
-    <rect class="card" x="28" width="314" height="90" rx="10"/><rect class="module" x="402" width="306" height="90" rx="10"/><rect class="card" x="777" width="251" height="90" rx="10"/>
-    <text class="head" x="45" y="29">四平台直播间</text><text class="body" x="45" y="54">B站、抖音、快手 · Java / OrdinaryRoad</text><text class="body" x="45" y="75">视频号 · Electron 授权直播后台</text>
-    <text class="code" x="419" y="35">core / LiveEventStream</text><text class="body" x="419" y="64">统一事件 v1 · 会话内去重 · 礼物增量</text>
-    <text class="code" x="794" y="35">subscribe()</text><text class="body" x="794" y="64">实时弹幕、礼物与其他互动</text>
-    <path class="arrow" d="M351 45H390"/><path class="arrow" d="M717 45H765"/>
+  <rect width="1056" height="520" rx="16" fill="#f3f7fa"/>
+  <text class="kicker" x="28" y="34">FurryUP LiveConnect　/　0.9.0　·　MIT 开源组件</text>
+  <rect class="badge" x="724" y="16" width="304" height="28" rx="14"/>
+  <text class="badge-text" x="876" y="35" text-anchor="middle">离线合成验证 · 本机凭据隔离 · 商业机密脱敏</text>
+  <text class="title" x="28" y="74">从多平台数据到宿主应用（开源协议层与商业宿主边界）</text>
+  <text class="col" x="28" y="116">01　平台与本机采集来源（隐私隔离）</text>
+  <text class="col" x="402" y="116">02　LiveConnect 开源组件（标准协议层）</text>
+  <text class="col" x="777" y="116">03　宿主读取与闭源业务（商业隔离）</text>
+  <g transform="translate(0 132)">
+    <rect class="card" x="28" width="314" height="96" rx="10"/><rect class="module" x="402" width="306" height="96" rx="10"/><rect class="host" x="777" width="251" height="96" rx="10"/>
+    <text class="head" x="45" y="28">四平台直播间</text><text class="body" x="45" y="53">B站、抖音、快手 · Java / OrdinaryRoad</text><text class="body" x="45" y="75">视频号 · Electron 本机后台（不外传凭据）</text>
+    <text class="code" x="419" y="30">core / LiveEventStream</text><text class="body" x="419" y="55">统一事件 v1 · 会话去重 · 礼物增量与单价兜底</text><text class="body" x="419" y="77">粉丝牌 / 航海等级 / 财富 · 在线与 PK 快照</text>
+    <text class="code" x="794" y="30">subscribe()</text><text class="body" x="794" y="55">消费标准弹幕、礼物与快照事件</text><text class="muted" x="794" y="77">专属特效 / 模型动作 / 助播归宿主闭源</text>
+    <path class="arrow" d="M351 48H390"/><path class="arrow" d="M717 48H765"/>
   </g>
   <g transform="translate(0 242)">
-    <rect class="card" x="28" width="314" height="85" rx="10"/><rect class="module" x="402" width="306" height="85" rx="10"/><rect class="card" x="777" width="251" height="85" rx="10"/>
-    <text class="head" x="45" y="32">五平台主页与本人后台</text><text class="body" x="45" y="60">B站、抖音、快手、视频号、小红书</text>
-    <text class="code" x="419" y="32">profiles</text><text class="body" x="419" y="60">校验平台身份 · 区分准确计数与约数</text>
-    <text class="head" x="794" y="32">粉丝快照</text><text class="body" x="794" y="60">按账号和数据时间比较变化</text>
+    <rect class="card" x="28" width="314" height="86" rx="10"/><rect class="module" x="402" width="306" height="86" rx="10"/><rect class="host" x="777" width="251" height="86" rx="10"/>
+    <text class="head" x="45" y="30">五平台主页与本人后台</text><text class="body" x="45" y="56">B站、抖音、快手、视频号、小红书</text><text class="muted" x="45" y="74">本机已授权会话或公开主页按需读取</text>
+    <text class="code" x="419" y="32">profiles</text><text class="body" x="419" y="58">校验平台身份 · 区分准确计数与约数</text>
+    <text class="head" x="794" y="32">粉丝快照</text><text class="body" x="794" y="58">按账号与时间对比，宿主自管存储</text>
     <path class="arrow" d="M351 43H390"/><path class="arrow" d="M717 43H765"/>
   </g>
-  <g transform="translate(0 340)">
-    <rect class="card" x="28" width="314" height="85" rx="10"/><rect class="module" x="402" width="306" height="85" rx="10"/><rect class="card" x="777" width="251" height="85" rx="10"/>
-    <text class="head" x="45" y="32">四平台创作者收益</text><text class="body" x="45" y="60">授权后台数据 · 已核对的账单导入</text>
-    <text class="code" x="419" y="32">revenue / ledger</text><text class="body" x="419" y="60">按来源和自然月归集 · 保留单位与覆盖</text>
-    <text class="head" x="794" y="32">收益分析</text><text class="body" x="794" y="60">自然月趋势、日明细与账户概览</text>
+  <g transform="translate(0 342)">
+    <rect class="card" x="28" width="314" height="86" rx="10"/><rect class="module" x="402" width="306" height="86" rx="10"/><rect class="host" x="777" width="251" height="86" rx="10"/>
+    <text class="head" x="45" y="30">四平台创作者收益</text><text class="body" x="45" y="56">授权后台数据 · 已核对的账单导入</text><text class="muted" x="45" y="74">本机会话同步，不上传云端服务器</text>
+    <text class="code" x="419" y="32">revenue / ledger</text><text class="body" x="419" y="58">按来源和自然月归集 · 保留单位与覆盖</text>
+    <text class="head" x="794" y="32">收益分析</text><text class="body" x="794" y="58">自然月趋势与明细，宿主自管复盘</text>
     <path class="arrow" d="M351 43H390"/><path class="arrow" d="M717 43H765"/>
   </g>
-  <path d="M28 445H1028" stroke="#cbd9e3"/>
-  <text class="foot" x="28" y="473">平台登录会话由采集设备持有。图表、应用账号与跨设备同步由宿主提供。</text>
+  <rect class="guard" x="28" y="444" width="1000" height="56" rx="10"/>
+  <text class="foot-title" x="44" y="467">隐私保护边界：</text><text class="foot" x="134" y="467">平台登录态与 Cookie 仅由采集设备本机持有；所有公开测试、回放与文档截图均使用离线合成数据（Synthetic Fixtures），不含真实账号或观众隐私。</text>
+  <text class="foot-title" x="44" y="489">商业机密边界：</text><text class="foot" x="134" y="489">本仓库仅公开底层采集与标准协议；FurryUP Studio 完整工作台、OBS 进房欢迎特效、Live2D 动作规则、多源交叉核验与智能助播策略均属闭源宿主。</text>
 </svg>

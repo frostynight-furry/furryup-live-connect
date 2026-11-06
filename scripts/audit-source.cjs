@@ -5,8 +5,8 @@ const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 // Only these reviewed demo captures may bypass the text-source check.
 const captures = new Map([
-  ['docs/images/live-and-followers.png','42abc1667c40f0c309b6f7a94de403e858f8f9d4262e63f1d55faedd2108ee1b'],
-  ['docs/images/monthly-revenue.png','69933a0d8ed91e74da6cd2fcb9026fc7242177a0d71a955d2474ba895ea430b4']
+  ['docs/images/live-and-followers.png','cf20fa473a0bdafc95b19271f3a706f2139940718d1d636365505897b1b0e5ff'],
+  ['docs/images/monthly-revenue.png','a092bc04c8122906e3eef298f4c099b71df82c4a3ccb77471814d88e8027ede2']
 ]);
 const allowed = new Set([
   ...captures.keys(), 'docs/images/architecture.svg',
