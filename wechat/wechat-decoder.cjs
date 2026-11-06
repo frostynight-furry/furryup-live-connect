@@ -70,7 +70,8 @@ function userBadges(contact) {
       const label = ({ 1: '主播', 3: '助手', 4: '助手', 5: '主播', 10: '房管' })[level];
       if (label) badges.push({ kind: 'role', label });
     } else if ((type === 2 || type === 4) && level > 0 && level <= 1000) {
-      badges.push({ kind: type === 2 ? 'wealth' : 'fans', label: type === 2 ? '等级' : '亲密度', level });
+      const customLabel = type === 4 ? boundedText(item.badgeName, 32).trim() : '';
+      badges.push({ kind: type === 2 ? 'wealth' : 'fans', label: type === 2 ? '等级' : (customLabel || '亲密度'), level });
     } else if (type === 12) badges.push({ kind: 'membership', label: '超级粉丝' });
   }
   return badges.length ? { user_badges: badges } : {};
@@ -143,7 +144,12 @@ function decodeWechatResponse(body, request = {}) {
       events.push({ ...user, event_type: 'gift', gift_id: giftId, gift_count: count,
         gift_name: '', ...details,
         content: boundedText(gift.content),
-        gift_price_raw: gift.reward_amount_in_wecoin, gift_price_unit: 'wechat_bean' });
+        gift_price_raw: (gift.reward_amount_in_wecoin !== undefined && gift.reward_amount_in_wecoin !== null && gift.reward_amount_in_wecoin !== '')
+          ? gift.reward_amount_in_wecoin
+          : (gift.reward_gift && typeof gift.reward_gift === 'object' && !Array.isArray(gift.reward_gift) && counter(gift.reward_gift.price) > 0
+            ? String(counter(gift.reward_gift.price) * count)
+            : undefined),
+        gift_price_unit: 'wechat_bean' });
     } catch { errors++; giftParseErrors++; }
   }
   const stats = Object.fromEntries([['onlineCnt', 'watching_count'], ['likeCnt', 'liked_count']]

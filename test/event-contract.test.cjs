@@ -32,7 +32,7 @@ test('all event variants conform; unknown values stay absent and snapshots are n
       room_stats: { watching_count: 0, liked_count: 'unknown' },
       live_status: { live_status: 'started' },
       viewer_snapshot: { viewer_snapshot: { source: 'synthetic', complete: false, presenceEvidence: 'unknown',
-        viewers: [{ userId: 'synthetic-viewer', userName: '合成 / Synthetic', online: true, rank: 1 }] } },
+        viewers: [{ userId: 'synthetic-viewer', userName: '合成 / Synthetic', online: true, guardLevel: 3, rank: 1 }] } },
       pk_status: { pk: { battleId: '9007199254740993', phase: 'active', protocol: 'PK_BATTLE_PROCESS',
         reason: 'battle-progress', observedAt: 1_800_000_000_000, scoreUnit: 'synthetic-unit',
         participants: [{ side: 'init', roomId: '9007199254740993', score: '18446744073709551615' },

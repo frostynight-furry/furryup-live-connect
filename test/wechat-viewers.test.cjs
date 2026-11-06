@@ -21,7 +21,7 @@ test('WeChat online-member reads visible contacts without claiming full coverage
   assert.equal(event.viewer_snapshot.viewers.length, 3);
   assert.equal(event.viewer_snapshot.viewers[0].avatarUrl, 'https://wx.qlogo.cn/synthetic.png');
   assert.equal(event.viewer_snapshot.viewers[0].rank, undefined);
-  assert.equal(event.viewer_snapshot.viewers[0].online, undefined);
+  assert.equal(event.viewer_snapshot.viewers[0].online, true);
   assert.equal(event.viewer_snapshot.viewers[1].userId, undefined);
 });
 

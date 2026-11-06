@@ -610,6 +610,14 @@
                 "minimum": 0,
                 "maximum": 1000
               },
+              "guardLevel": {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
               "rank": {
                 "type": "integer",
                 "minimum": 1,

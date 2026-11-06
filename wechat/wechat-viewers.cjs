@@ -44,8 +44,16 @@ function decodeWechatViewersResponse(body, request = {}) {
     const userName = text(item.displayNickname);
     const avatar = avatarInfo(contact.headUrl, 'wechat');
     if (!userId && !userName && !avatar.avatar_url) continue;
+    const badgeInfos = Array.isArray(item.badgeInfos) ? item.badgeInfos : [];
+    const wealthBadge = badgeInfos.find(b => b && b.badgeType === 2 && Number.isSafeInteger(b.badgeLevel) && b.badgeLevel >= 0 && b.badgeLevel <= 1000);
+    const fanBadge = badgeInfos.find(b => b && b.badgeType === 4 && Number.isSafeInteger(b.badgeLevel) && b.badgeLevel >= 0 && b.badgeLevel <= 1000);
+    const wealthLevel = wealthBadge ? wealthBadge.badgeLevel : (Number.isSafeInteger(item.consumeLevel) && item.consumeLevel >= 0 && item.consumeLevel <= 1000 ? item.consumeLevel : undefined);
+    const userLevel = fanBadge ? fanBadge.badgeLevel : (Number.isSafeInteger(item.userLevel) && item.userLevel >= 0 && item.userLevel <= 1000 ? item.userLevel : undefined);
     viewers.push({
       ...(userId && { userId }), userName: userName || '一位朋友',
+      online: true,
+      ...(userLevel !== undefined && { userLevel }),
+      ...(wealthLevel !== undefined && { wealthLevel }),
       ...(avatar.avatar_url && { avatarUrl: avatar.avatar_url })
     });
   }

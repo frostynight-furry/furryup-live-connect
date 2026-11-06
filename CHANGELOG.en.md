@@ -6,7 +6,7 @@
 
 Hosts can verify a creator after an official QR login and reuse the platform session. The revenue module syncs four platforms and preserves native units, partial coverage, and missing months. WeChat Channels exposes account balances and lifetime income separately from monthly records. The independent Douyin wallet endpoint requires its own login context.
 
-The live collectors improve Bilibili audience attribution, Kuaishou gift prices and Channels gift metadata and combo handling. The Channels collector accepts an authorized host session.
+The live collectors improve Bilibili audience attribution, Kuaishou gift prices and Channels gift metadata and combo handling. Channels online viewer snapshots (`wechat-online-list`) now preserve explicit `online: true`, wealth levels (`badge_type=2`) and fan club levels (`badge_type=4`); `20009` gift events fall back to `reward_gift.price × reward_product_count` when `reward_amount_in_wecoin` is omitted and retain custom fan badge names. Normalized `viewer_snapshot` entries also preserve `guardLevel` (`1` / `2` / `3`). The Channels collector accepts an authorized host session.
 
 ## 0.8.0 — 2026-10-26
 

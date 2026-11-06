@@ -199,12 +199,14 @@ function normalizeEvent(raw, platform, roomId, preview = false) {
       const userId = viewerId(viewer.userId);
       const userLevel = nonnegativeCount(viewer.userLevel, 1000);
       const wealthLevel = nonnegativeCount(viewer.wealthLevel, 1000);
+      const guardLevel = [1, 2, 3].includes(viewer.guardLevel) ? viewer.guardLevel : undefined;
       const rank = nonnegativeCount(viewer.rank, 500);
       // A directly supplied display image does not establish a stable identity.
       // Anonymous rows remain unlinked to chat or other viewer rows.
       const avatar = avatarInfo(viewer.avatarUrl, platform);
       return Object.freeze({ ...(userId ? { userId } : {}), userName: optionalText(viewer.userName, 64) || '一位朋友',
         ...(userLevel !== undefined ? { userLevel } : {}), ...(wealthLevel !== undefined ? { wealthLevel } : {}),
+        ...(guardLevel !== undefined ? { guardLevel } : {}),
         ...(rank > 0 ? { rank } : {}),
         ...(avatar.avatar_id ? { avatarUrl: avatar.avatar_url, avatarId: avatar.avatar_id } : {}),
         ...(typeof viewer.online === 'boolean' ? { online: viewer.online } : {}),
