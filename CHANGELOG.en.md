@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1 (2026-11-08)
+
+- **WeChat Channels Gift Catalog & Collector Resilience**: Extended gift catalog snapshot TTL to 24 hours with automatic active-session renewal (`wechat/wechat-gifts.cjs`) and added bounded operation timeouts in `wechat/wechat-collector.cjs`.
+- **Creator Monthly Revenue Sync**: Added `deferHistory` fast current-month settlement callback (`revenue/creator-sync.cjs`), `handle` identity verification (`revenue/creator-sync-state.cjs`), and improved Kuaishou & WeChat Channels statement parsers.
+
 [中文](CHANGELOG.md)
 
 ## 0.9.0 (source)

@@ -14,13 +14,13 @@
 | WeChat Channels | Authorized Electron live dashboard | Creator session | Account overview and eligible live settlements |
 | Xiaohongshu | — | Public profile and creator-session adapters. Real-account collection awaits verification. | — |
 
-The source on this branch is **0.9.0**. The three Java collectors reuse OrdinaryRoad 1.5.8. Channels uses a local authorized Electron session. Follower snapshots distinguish exact and rounded counts. Revenue keeps missing periods, balances, lifetime amounts and platform-native units distinct. [Follower adapters](docs/CREATOR_FOLLOWERS.en.md) · [Revenue](docs/CREATOR_REVENUE.en.md) · [Automatic sync](docs/REVENUE_SYNC.en.md) · [Douyin wallet](docs/DOUYIN_WALLET.en.md) · [Tagged source](https://github.com/frostynight-furry/furryup-live-connect/releases)
+The source on this branch is **0.9.1**. The three Java collectors reuse OrdinaryRoad 1.5.8. Channels uses a local authorized Electron session. Follower snapshots distinguish exact and rounded counts. Revenue keeps missing periods, balances, lifetime amounts and platform-native units distinct. [Follower adapters](docs/CREATOR_FOLLOWERS.en.md) · [Revenue](docs/CREATOR_REVENUE.en.md) · [Automatic sync](docs/REVENUE_SYNC.en.md) · [Douyin wallet](docs/DOUYIN_WALLET.en.md) · [Tagged source](https://github.com/frostynight-furry/furryup-live-connect/releases)
 
 ## See the results
 
-These screenshots arrange the bundled demos' output alongside the 0.9.0 protocol enhancements by platform. Four synthetic rooms produce 12 accepted events with four duplicate deliveries filtered, while highlighting normalized guard/wealth/fan badge levels, gift unit-price fallback and online viewer snapshots. The public profile demo returns explicit authorization or manual states. All visuals use `synthetic-*` fixtures with zero real accounts or audience records. [Event demo](examples/offline-demo.cjs) · [Profile demo](examples/profile-demo.cjs)
+These screenshots arrange the bundled demos' output alongside the 0.9.1 protocol enhancements by platform. Four synthetic rooms produce 12 accepted events with four duplicate deliveries filtered, while highlighting normalized guard/wealth/fan badge levels, gift unit-price fallback and online viewer snapshots. The public profile demo returns explicit authorization or manual states. All visuals use `synthetic-*` fixtures with zero real accounts or audience records. [Event demo](examples/offline-demo.cjs) · [Profile demo](examples/profile-demo.cjs)
 
-![Offline demo output showing four live event streams, 0.9.0 badge/snapshot capabilities and five platform profile results](docs/images/live-and-followers.png)
+![Offline demo output showing four live event streams, 0.9.1 badge/snapshot capabilities and five platform profile results](docs/images/live-and-followers.png)
 
 In the revenue fixture, Bilibili's full monthly report and its two observed trend days have different coverage. Douyin's CNY values and its native live engagement unit have separate series, illustrating the open-source ledger structure without real creator statements or proprietary revenue rules. [Revenue demo](examples/revenue-demo.cjs)
 

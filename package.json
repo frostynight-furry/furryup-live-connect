@@ -1,6 +1,6 @@
 {
   "name": "furryup-live-connect",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "多平台直播与创作者数据采集组件，提供五平台主页与粉丝、四平台直播事件和自然月收益账本",
   "license": "MIT",

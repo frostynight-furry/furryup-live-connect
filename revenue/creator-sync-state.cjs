@@ -4,9 +4,9 @@ const { createHash, randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises'), path = require('node:path');
 const { binding, fault, timestamp, month, chinaDay, token } = require('./model.cjs');
 const { createRevenueLedger } = require('./ledger.cjs');
-const identityKinds = { bilibili: ['uid'], douyin: ['account-cookie-uid_tt', 'native_uid'],
+const identityKinds = { bilibili: ['uid'], douyin: ['account-cookie-uid_tt', 'handle', 'native_uid'],
   kuaishou: ['user_id', 'account-cookie-userId', 'account-cookie-kuaishou.userId'], wechat_channels: ['finder'] };
-const sourcesFor = (platform, identityKind) => platform === 'douyin' ? identityKind === 'native_uid' ? ['wallet'] : ['creator_center', 'anchor_dashboard', 'wallet'] : ['creator_center'];
+const sourcesFor = (platform, identityKind) => platform === 'douyin' ? identityKind === 'native_uid' ? ['wallet'] : identityKind === 'handle' ? ['creator_center'] : ['creator_center', 'anchor_dashboard', 'wallet'] : ['creator_center'];
 const informative = new Set(['REVENUE_HISTORY_RECENT_DAYS_ONLY', 'REVENUE_ANCHOR_NOT_REQUESTED', 'REVENUE_NATIVE_UNIT_NOT_CNY',
   'REVENUE_LIVE_ANALYTICS_NOT_NET_SETTLEMENT', 'REVENUE_INCENTIVE_PROGRAM_SCOPE_LIMITED', 'REVENUE_HISTORY_PLATFORM_VISIBLE_ONLY',
   'REVENUE_COMPANY_SETTLEMENT_SUBJECT_SCOPE', 'REVENUE_ADDITIONAL_SETTLEMENT_ACCOUNTS_NOT_INCLUDED',

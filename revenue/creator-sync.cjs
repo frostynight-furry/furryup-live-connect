@@ -6,7 +6,7 @@ const { syncBinding, stateKey, cleanState, cleanIssues, safeCode, informative, u
 const active = new Set();
 function createCreatorRevenueSync({ owner, platform, accountId, identityKind, deviceId, getAccount, reader, store, initialLedger,
   sources = sourcesFor(platform, identityKind), fromMonth, batchMonths = 6, intervalMs = 6 * 3600000, backfillIntervalMs = 60000,
-  historyRefreshMs = 30 * 86400000, now = Date.now, onStatus = () => {}, timers = { setTimeout, clearTimeout } } = {}) {
+  historyRefreshMs = 30 * 86400000, now = Date.now, onStatus = () => {}, timers = { setTimeout, clearTimeout }, deferHistory = () => false } = {}) {
   const bound = syncBinding({ owner, platform, accountId, identityKind }), key = stateKey(bound);
   if (typeof getAccount !== 'function' || typeof reader?.lookup !== 'function' || typeof store?.load !== 'function' || typeof store?.save !== 'function' ||
     typeof now !== 'function' || typeof onStatus !== 'function' || typeof timers.setTimeout !== 'function' || typeof timers.clearTimeout !== 'function') throw new TypeError('Reader, store and owner guard are required');
@@ -87,9 +87,13 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
       for (const name of sources) if (!state.sources.some(s => s.source === name)) state.sources.push({ source: name, status: 'idle', failures: 0, months: [], issues: [] });
       await save(state, version);
       for (const name of only || sources) {
-        guard(version); let source = state.sources.find(s => s.source === name), attempts = 0; const attempted = new Set();
+        guard(version); let source = state.sources.find(s => s.source === name), attempts = 0, postponed=false; const attempted = new Set();
         while (attempts < (perMonth(source) ? batchMonths : 1)) {
           const job = jobs(source, force).find(j => !attempted.has(j.fromMonth)); if (!job) break;
+          if(!force && job.toMonth<current()){
+            const live=await deferHistory();guard(version);
+            if(live){postponed=true;break;}
+          }
           attempts++; attempted.add(job.fromMonth);
           const attemptAt = iso(); let snapshot;
           try {
@@ -143,6 +147,10 @@ function createCreatorRevenueSync({ owner, platform, accountId, identityKind, de
           }
         }
         const stored = state.sources.find(s => s.source === name);
+        if(postponed){
+          await updateSource({...stored,nextCheckAt:new Date(now()+backfillIntervalMs).toISOString()},state.ledger,version);
+          continue;
+        }
         if (!attempts && stored.status !== 'needs_login' && (!stored.nextCheckAt || stored.nextCheckAt <= iso())) {
           await updateSource({ ...stored, nextCheckAt: new Date(now() + intervalMs).toISOString() }, state.ledger, version);
         }

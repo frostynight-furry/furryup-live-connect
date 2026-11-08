@@ -57,7 +57,7 @@ function limit(value, fallback, max) {
 }
 class WechatGiftCatalog {
   constructor({ now = Date.now, ttlMs = 30 * 60_000, maxRooms = 8, maxEntries = 512 } = {}) {
-    this.now = now; this.ttlMs = limit(ttlMs, 30 * 60_000, 30 * 60_000);
+    this.now = now; this.ttlMs = limit(ttlMs, 30 * 60_000, 24 * 60 * 60_000);
     this.maxRooms = limit(maxRooms, 8, 8); this.maxEntries = limit(maxEntries, 512, 512);
     this.rooms = new Map(); this.details = new Map();
   }
@@ -85,9 +85,11 @@ class WechatGiftCatalog {
     this.prune();
     if (event?.event_type !== 'gift') return event;
     const room = metadataRoomId(roomId), id = exactId(event.gift_id);
+    const snapshot = this.rooms.get(room);
+    if (snapshot?.gifts.size) snapshot.expiresAt = this.now() + this.ttlMs;
     const details = this.details.get(room)?.get(id);
     const name = typeof event.gift_name === 'string' && event.gift_name.trim() ? '' : details?.gift_name;
-    const image = event.gift_image_url ? '' : details?.gift_image_url || this.rooms.get(room)?.gifts.get(id);
+    const image = event.gift_image_url ? '' : details?.gift_image_url || snapshot?.gifts.get(id);
     // Fill missing display metadata by exact room/product ID only. Never change
     // quantities, prices or identities; never match a nickname or display text.
     return name || image ? { ...event, ...(name && { gift_name: name }), ...(image && { gift_image_url: image }) } : event;

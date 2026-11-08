@@ -19,13 +19,13 @@
 | 微信视频号 | Electron 本人直播后台 | 本人后台 | 账户概览，按账号条件读取直播结算 |
 | 小红书 | — | 主页与本人后台适配，实际账号读取待验证 | — |
 
-当前开发源码为 **0.9.0**。三种 Java 采集器复用 OrdinaryRoad 1.5.8。视频号通过本机已授权的 Electron 会话采集。粉丝接口会区分准确计数、约数和验证状态。平台未返回的收益保留为空，累计收入、可提现余额和音浪单列。[粉丝采集](docs/CREATOR_FOLLOWERS.md) · [收益接入](docs/CREATOR_REVENUE.md) · [自动同步](docs/REVENUE_SYNC.md) · [抖音钱包](docs/DOUYIN_WALLET.md) · [已发行源码](https://github.com/frostynight-furry/furryup-live-connect/releases)
+当前开发源码为 **0.9.1**。三种 Java 采集器复用 OrdinaryRoad 1.5.8。视频号通过本机已授权的 Electron 会话采集。粉丝接口会区分准确计数、约数和验证状态。平台未返回的收益保留为空，累计收入、可提现余额和音浪单列。[粉丝采集](docs/CREATOR_FOLLOWERS.md) · [收益接入](docs/CREATOR_REVENUE.md) · [自动同步](docs/REVENUE_SYNC.md) · [抖音钱包](docs/DOUYIN_WALLET.md) · [已发行源码](https://github.com/frostynight-furry/furryup-live-connect/releases)
 
 ## 看一次采集结果
 
-下图将仓库离线示例的实际输出与 0.9.0 四平台协议增强字段按平台排版。四个直播间共送入 12 条有效合成事件，另有 4 条重复事件被过滤，并同步展示大航海（`guardLevel`）、财富/粉丝牌等级、礼物单价兜底与在线快照能力。右栏展示公开主页示例在不同平台返回的状态。全部演示均采用 `synthetic-*` 脱敏合成数据，不含任何真实房间或观众信息。[直播示例](examples/offline-demo.cjs) · [主页示例](examples/profile-demo.cjs)
+下图将仓库离线示例的实际输出与 0.9.1 四平台协议增强字段按平台排版。四个直播间共送入 12 条有效合成事件，另有 4 条重复事件被过滤，并同步展示大航海（`guardLevel`）、财富/粉丝牌等级、礼物单价兜底与在线快照能力。右栏展示公开主页示例在不同平台返回的状态。全部演示均采用 `synthetic-*` 脱敏合成数据，不含任何真实房间或观众信息。[直播示例](examples/offline-demo.cjs) · [主页示例](examples/profile-demo.cjs)
 
-![直播事件、0.9.0 协议增强字段与五平台主页离线示例（离线合成脱敏数据）](docs/images/live-and-followers.png)
+![直播事件、0.9.1 协议增强字段与五平台主页离线示例（离线合成脱敏数据）](docs/images/live-and-followers.png)
 
 收益示例中，同一个 B站月报有完整月份，趋势接口只覆盖其中两天。查看趋势时可以直接看到缺了多少天。同一个抖音账号的人民币收益和直播音浪保留各自单位，仅演示开源账本归集结构，不含真实创作者流水或商业分成模型。[自然月收益示例](examples/revenue-demo.cjs)
 
@@ -35,7 +35,7 @@
 
 直播事件通过 `core` 订阅，粉丝快照通过 `profiles` 获取，收益通过 `revenue` 生成自然月账本。平台登录态与 Cookie 仅留存采集设备本机；专属进房欢迎特效、Live2D 动作规则、多源交叉核验与智能助播策略均由闭源宿主独立实现，不在本开源仓库公开。
 
-![LiveConnect 0.9.0 数据流与隐私商业隔离边界](docs/images/architecture.svg)
+![LiveConnect 0.9.1 数据流与隐私商业隔离边界](docs/images/architecture.svg)
 
 [事件字段](docs/EVENTS.md) · [排错指南](docs/TROUBLESHOOTING.md) · [应用案例](docs/SHOWCASE.md) · [更新记录](CHANGELOG.md)
 

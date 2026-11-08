@@ -48,10 +48,10 @@ function allowedPage(value) {
   try { const url = new URL(value); return url.protocol === 'https:' && !url.port && !url.username && !url.password &&
     (url.hostname === 'weixin.qq.com' || url.hostname.endsWith('.weixin.qq.com')); } catch { return false; }
 }
-function bounded(promise) {
+function bounded(promise, timeoutMs = 3000) {
   let timer;
   return Promise.race([promise, new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('Login state operation timed out')), 3000);
+    timer = setTimeout(() => reject(new Error('Login state operation timed out')), timeoutMs);
   })]).finally(() => clearTimeout(timer));
 }
 const PAGE_LOAD_ERROR = '视频号后台暂时无法打开，请检查网络并在后台窗口刷新，或断开后重新连接。';
@@ -362,7 +362,7 @@ class WechatCollector extends ObserverSafeEmitter {
     }
     run.authInFlight++;
     try {
-      const response = await run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id });
+      const response = await bounded(run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id }), 5000);
       if (!run.active) return;
       if (typeof response.body !== 'string' || response.body.length > MAX_LOGIN_BODY * 1.4) throw new Error('Invalid login body');
       const body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString('utf8') : response.body;
@@ -392,7 +392,7 @@ class WechatCollector extends ObserverSafeEmitter {
     }
     run.metadataInFlight++;
     try {
-      const response = await run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id });
+      const response = await bounded(run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id }), 5000);
       if (!run.active) return;
       if (typeof response.body !== 'string' || response.body.length > MAX_BODY * 1.4) throw new Error('Invalid metadata body');
       const body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString('utf8') : response.body;
@@ -489,7 +489,7 @@ class WechatCollector extends ObserverSafeEmitter {
       }
       run.inFlight++;
       try {
-        const response = await run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id });
+        const response = await bounded(run.window.webContents.debugger.sendCommand('Network.getResponseBody', { requestId: id }), 5000);
         if (!run.active) return;
         if (typeof response.body !== 'string' || response.body.length > MAX_BODY * 1.4) throw new Error('Invalid body');
         const body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString('utf8') : response.body;

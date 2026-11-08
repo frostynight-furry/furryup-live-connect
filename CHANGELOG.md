@@ -1,3 +1,10 @@
+# 更新日志
+
+## 0.9.1 (2026-11-08)
+
+- **微信视频号礼物目录保鲜与超时保护**：将微信视频号房间礼物目录缓存有效期提升至 24 小时，并在收到礼物事件时自动顺延快照有效期（`wechat/wechat-gifts.cjs`）；为页面采集器操作增加 `bounded` 超时保护（`wechat/wechat-collector.cjs`），避免挂起阻塞。
+- **创作者自然月收益同步增强**：支持首屏极速对账与历史月份延迟回补（`deferHistory`，`revenue/creator-sync.cjs`），新增创作者身份 `handle` 维度核验（`revenue/creator-sync-state.cjs`），并优化快手与微信视频号流水解析稳定性。
+
 # 更新记录
 
 [English](CHANGELOG.en.md)
